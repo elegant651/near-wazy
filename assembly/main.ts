@@ -13,11 +13,41 @@
  */
 
 import { Context, logging, storage } from "near-sdk-as";
+import { TodoData, todoList, todoMap } from "./model";
 
-const DEFAULT_MESSAGE = "Hello"
+const DEFAULT_MESSAGE = "Hello";
 
-// Exported functions will be part of the public interface for your smart contract.
-// Feel free to extract behavior to non-exported functions!
+
+export function writeTodo(title: string, photo: Uint8Array): void {  
+  const newData = new TodoData(title, photo);
+  todoList.push(newData);
+  todoMap.set(newData.todoId, newData);
+}
+
+export function verifyTodo(todoId: i32) {
+  let todoData = todoMap.get(todoId)
+  todoData?.setVerified(true);
+}
+
+export function getTotalTodoCount(): i32 {
+  return todoList.length;
+}
+
+export function getTodoList(): TodoData[] {
+  const numList = min(20, todoList.length);
+  const startIndex = todoList.length - numList;
+  const result = new Array<TodoData>(numList);
+  for (let i=0; i < numList; i++) {
+    result[i] = todoList[i + startIndex];
+  }
+  return result
+}
+
+export function getTodo(todoId: i32): TodoData|null {
+  const todoData = todoMap.get(todoId);
+  return todoData;
+}
+
 export function getGreeting(accountId: string): string | null {
   // This uses raw `storage.get`, a low-level way to interact with on-chain
   // storage for simple contracts.
