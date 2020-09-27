@@ -1,0 +1,15 @@
+.Button {
+  -webkit-appearance: none;
+  width: 100%;  
+  border-radius: 5px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 23px;
+  cursor: pointer;
+
+  &:hover,
+  &:active {    
+    color: #fff;
+  }
+}

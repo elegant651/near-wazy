@@ -1,0 +1,17 @@
+.PhotoHeader {
+  padding: 24px 24px 24px 72px;
+  border-bottom: 1px solid #000;  
+}
+
+.PhotoHeader__owner {
+  display: block;
+  font-weight: bold;
+  line-height: 20px;
+  @include textEllipsis();
+  &:hover { text-decoration: underline; }
+}
+
+.PhotoHeader__location {  
+  line-height: 20px;
+  @include textEllipsis();
+}
