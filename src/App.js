@@ -1,5 +1,8 @@
 import 'regenerator-runtime/runtime'
 import React, { useCallback, useEffect, useState } from 'react'
+import FeedPage from './pages/Feeds'
+import Modal from './components/Modal'
+import Toast from './components/Toast'
 import PropTypes from 'prop-types'
 import Big from 'big.js'
 
@@ -54,6 +57,9 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
 
   return (
     <main>
+      <Modal />
+      <Toast />
+
       <header style={{
         display: 'flex',
         alignItems: 'center',
@@ -124,7 +130,10 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
               {message.text}
             </p>
           )}
-        </>
+          
+
+          <FeedPage />
+        </>        
       )}
     </main>
   )

@@ -3,7 +3,7 @@ import {
   HIDE_MODAL,
   SHOW_TOAST,
   HIDE_TOAST,
-} from 'redux/actions/actionTypes'
+} from '../actions/actionTypes'
 
 const initialState = {
   modal: null,

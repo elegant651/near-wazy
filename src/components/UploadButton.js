@@ -1,6 +1,6 @@
 import React from 'react'
-import ui from 'utils/ui'
-import UploadPhoto from 'components/UploadPhoto'
+import ui from '../utils/ui'
+import UploadPhoto from './UploadPhoto'
 
 import './UploadButton.scss'
 

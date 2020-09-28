@@ -1,4 +1,4 @@
-import ui from 'utils/ui'
+import ui from '../../utils/ui'
 import { SET_FEED } from './actionTypes'
 
 

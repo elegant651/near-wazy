@@ -8,15 +8,10 @@
   background-color: rgba(0, 0, 0, .8);
 }
 
-.Modal {
-  @include fixed-center();
-  @include cardBox();
+.Modal {  
   width: 100%;
   max-width: 600px;
-
-  @include breakpoint("max-card") {
-    width: 95%;
-  }
+  background-color: #fff;
 }
 
 .Modal__header {
@@ -27,15 +22,12 @@
   border-bottom: 1px solid #000;
 }
 
-.Modal__body {
-  @include clear-both();
+.Modal__body { 
   padding: 40px 24px;
 }
 
-.Modal__close {
-  @include imageReplacement(24px, 24px, "/images/icon-close.png", $white);
-  position: absolute;
-  top: 18px;
-  right: 24px;
+.Modal__close {  
+  // position: absolute;  
+  margin: 20px;
   cursor: pointer;
 }

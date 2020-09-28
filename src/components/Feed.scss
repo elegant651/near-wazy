@@ -5,10 +5,7 @@
     padding: 60px 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    @include breakpoint("max-card") {
-      padding: 40px 0;
-    }
+    align-items: center;    
   }
   
   .FeedPhoto {
@@ -16,11 +13,7 @@
     width: 100%;
     max-width: 600px;
     margin-bottom: 60px;
-    &:last-child { margin-bottom: 0; }
-    @include cardBox();
-    @include breakpoint("max-card") {
-      margin-bottom: 20px;
-    }
+    &:last-child { margin-bottom: 0; }    
   }
   
   .FeedPhoto__image {
@@ -44,6 +37,5 @@
   
   .Feed__empty {
     font-size: 20px;
-    font-weight: bold;
-    @include fixed-center();
+    font-weight: bold;    
   }

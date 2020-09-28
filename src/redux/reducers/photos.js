@@ -1,4 +1,4 @@
-import { SET_FEED } from 'redux/actions/actionTypes'
+import { SET_FEED } from '../actions/actionTypes'
 
 const initialState = {
   feed: null,

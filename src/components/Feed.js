@@ -6,7 +6,7 @@ import PhotoInfo from './PhotoInfo'
 import CopyrightInfo from './CopyrightInfo'
 import TransferOwnershipButton from './TransferOwnershipButton'
 import { drawImageFromBytes} from '../utils/imageUtils'
-
+import * as photoActions from '../redux/actions/photos'
 
 import './Feed.scss'
 
@@ -32,7 +32,7 @@ class Feed extends Component {
   }
 
   render() {
-    const { feed, userAddress } = this.props
+    const { feed } = this.props
 
     if (this.state.isLoading) return <Loading />
 
@@ -69,20 +69,20 @@ class Feed extends Component {
                     currentOwner={currentOwner}
                   />
                   {
-                    userAddress === currentOwner && (
+                    // userAddress === currentOwner && (
                       <TransferOwnershipButton
                         className="FeedPhoto__transferOwnership"
                         id={id}
                         issueDate={issueDate}
                         currentOwner={currentOwner}
                       />
-                    )
+                    // )
                   }
                 </div>
               </div>
             )
           })
-          : <span className="Feed__empty">No Photo :D</span>
+          : <span className="Feed__empty">No Photo</span>
         }
       </div>
     )
@@ -90,8 +90,7 @@ class Feed extends Component {
 }
 
 const mapStateToProps = (state) => ({
-  feed: state.photos.feed,
-  userAddress: state.auth.address,
+  feed: state.photos.feed  
 })
 
 const mapDispatchToProps = (dispatch) => ({

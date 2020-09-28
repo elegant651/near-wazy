@@ -102,19 +102,6 @@ button, input {
   outline: none;
 }
 
-button {
-  position: relative;
-  transition: top 50ms;
-  &:hover, &:focus {
-    top: -1px;
-  }
-  &:active {
-    background: var(--secondary);
-    border-color: var(--secondary);
-    top: 1px;
-  }
-}
-
 .is-premium {
   border-left: 0.25em solid var(--secondary);
   padding-left: 0.25em;

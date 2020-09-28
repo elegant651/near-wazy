@@ -4,11 +4,10 @@ import './Loading.scss'
 
 const Loading = () => (
   <div className="Loading">
-    <img
-      src="/images/loading.png"
+    <div      
       className="Loading__spinner"
       alt="loading"
-    />
+    >Loading...</div>
   </div>
 );
 

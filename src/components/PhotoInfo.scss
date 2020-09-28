@@ -1,8 +1,7 @@
 .PhotoInfo__name,
 .PhotoInfo__caption {
   width: 420px;
-  font-size: 14px;
-  @include breakWord();
+  font-size: 14px;  
 }
 
 .PhotoInfo__name {

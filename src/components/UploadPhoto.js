@@ -7,7 +7,7 @@ import InputFile from './InputFile'
 import Textarea from './Textarea'
 import Button from './Button'
 
-import * as photoActions from 'redux/actions/photos'
+import * as photoActions from '../redux/actions/photos'
 
 import './UploadPhoto.scss'
 
