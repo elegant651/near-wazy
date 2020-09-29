@@ -10,7 +10,7 @@ const Modal = ({ modal }) => (
       <div className="Modal" style={modal.width && { width: `${modal.width}` }}>
         <h2 className="Modal__header">{modal.header}</h2>        
         <div className="Modal__body">{modal.content}</div>
-        <button className="Modal__close" onClick={ui.hideModal}>Close modal</button> 
+        <button className="Modal__close" onClick={ui.hideModal}>Close</button> 
       </div>
     </div>
   )

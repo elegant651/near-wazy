@@ -8,7 +8,7 @@ const UploadButton = ({contract, currentUser}) => (
   <button
     className="UploadButton"
     onClick={() => ui.showModal({
-      header: 'Upload Photo',
+      header: 'Create Todo',
       content: <UploadPhoto contract={contract} currentUser={currentUser}   />,
     })}
   >

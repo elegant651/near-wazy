@@ -1,53 +1,58 @@
 import ui from '../../utils/ui'
 import { SET_FEED } from './actionTypes'
+import Big from 'big.js'
+import axios from 'axios'
 
+const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed()
 
 // Action creators
 
-const setFeed = (feed) => ({
+const setFeeds = (feeds) => ({
   type: SET_FEED,
-  payload: { feed },
+  payload: { feeds },
 })
 
 const updateFeed = (tokenId) => (dispatch, getState) => {
   
 }
 
-const updateOwnerAddress = (tokenId, to) => (dispatch, getState) => {
-  const { photos: { feed } } = getState()
-  const newFeed = feed.map((photo) => {
-    if (photo[ID] !== tokenId) return photo
-    photo[OWNER_HISTORY].push(to)
-    return photo
-  })
-  dispatch(setFeed(newFeed))
-}
-
-
 // API functions
 
-export const getFeed = () => (dispatch) => {
-  
+export const getFeeds = (contract) => (dispatch) => {  
+  contract.getTodoList().then((feeds)=> {
+    console.log(feeds)
+    dispatch(setFeeds(feeds))
+  })
 }
 
-export const uploadPhoto = (
-  file,
-  fileName,  
-  title
-) => (dispatch) => {
-  const reader = new window.FileReader()
-  reader.readAsArrayBuffer(file)
-  reader.onloadend = () => {
-    const buffer = Buffer.from(reader.result)
-    /**
-     * Add prefix `0x` to hexString
-     * to recognize hexString as bytes by contract
-     */
-    const hexString = "0x" + buffer.toString('hex')
-    
-  }
+export const verifyTodo = (contract, todoId) => (dispatch) => {
+  contract.verifyTodo(
+    { todoId: todoId },
+    BOATLOAD_OF_GAS
+  ).then((result) => {
+    dispatch(getFeeds(contract))
+  })
+
 }
 
-export const transferOwnership = (tokenId, to) => (dispatch) => {
-  
+export const uploadTodo = (contract, title, file) => (dispatch) => {
+  const formData = new FormData()
+    formData.append('file', file)
+    axios({
+      method: 'post',
+      baseURL: 'https://ipfs.infura.io:5001',
+      url: '/api/v0/add',
+      data: formData,
+      headers: {'Content-Type': 'multipart/form-data'}
+    }).then(async (response)=> {      
+      const photoURI = response.data.Hash
+
+      const result = await contract.writeTodo(
+        { title: title, photo: photoURI },
+        BOATLOAD_OF_GAS
+      )
+      console.log(result)
+      
+      dispatch(getFeeds(contract))      
+    })
 }

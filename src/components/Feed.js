@@ -1,23 +1,19 @@
 import React, { Component } from 'react'
 import { connect } from 'react-redux'
-import moment from 'moment'
 import Loading from './Loading'
 import PhotoInfo from './PhotoInfo'
 import Button from './Button'
 import ui from '../utils/ui'
-import Big from 'big.js'
+import * as photoActions from '../redux/actions/photos'
 
 import './Feed.scss'
-
-const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed()
 
 class Feed extends Component {
   
   constructor(props) {
     super(props)
     this.state = {
-      isLoading: false,
-      feeds: []
+      isLoading: false      
     }
   }
 
@@ -30,43 +26,26 @@ class Feed extends Component {
   }
 
   componentDidMount() {
-    const { contract, currentUser } =  this.props
-
-    this.setState({isLoading: true})    
-
-    contract.getTodoList().then((feeds)=> {
-      console.log(feeds)
-      this.setState({isLoading: false, feeds })
-    })
+    const { contract, getFeeds } = this.props
+  
+    getFeeds(contract)
   }
 
   async verify(todoId) {
-    const { contract } =  this.props
+    const { contract, verifyTodo } =  this.props    
 
-    this.setState({isLoading: true})    
-
-    const result = await contract.verifyTodo(
-      { todoId: todoId },
-      BOATLOAD_OF_GAS
-    )
-    console.log(result)
-
-    contract.getTodoList().then((feeds)=> {
-      console.log(feeds)
-      this.setState({isLoading: false, feeds })
-    })
-
+    verifyTodo(contract, todoId)
   }
 
   render() {
-    const { feeds } = this.state
+    const { feed } = this.props    
 
     if (this.state.isLoading) return <Loading />
 
     return (
       <div className="Feed">
-        {feeds.length !== 0
-          ? feeds.map(({
+        {feed && feed.length !== 0
+          ? feed.map(({
             todoId,
             owner,
             title,
@@ -111,11 +90,12 @@ class Feed extends Component {
 }
 
 const mapStateToProps = (state) => ({
-  // feed: state.photos.feed  
+  feed: state.photos.feed  
 })
 
 const mapDispatchToProps = (dispatch) => ({
-  // getFeed: () => dispatch(photoActions.getFeed()),
+  getFeeds: (contract) => dispatch(photoActions.getFeeds(contract)),
+  verifyTodo: (contract, todoId) => dispatch(photoActions.verifyTodo(contract, todoId))
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(Feed)
