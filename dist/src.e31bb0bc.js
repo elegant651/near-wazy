@@ -35706,66 +35706,7 @@ const Input = ({
 
 var _default = Input;
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./Input.scss":"components/Input.scss"}],"components/InputFile.scss":[function(require,module,exports) {
-var reloadCSS = require('_css_loader');
-
-module.hot.dispose(reloadCSS);
-module.hot.accept(reloadCSS);
-},{"_css_loader":"../node_modules/parcel-bundler/src/builtins/css-loader.js"}],"components/InputFile.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _react = _interopRequireDefault(require("react"));
-
-var _classnames = _interopRequireDefault(require("classnames"));
-
-require("./InputFile.scss");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const Input = ({
-  className,
-  name,
-  value,
-  label,
-  fileName,
-  onChange,
-  required,
-  accept,
-  err
-}) => /*#__PURE__*/_react.default.createElement("div", {
-  className: (0, _classnames.default)('InputFile', className, {
-    'InputFile--err': err
-  })
-}, /*#__PURE__*/_react.default.createElement("p", {
-  className: "InputFile__label"
-}, label), /*#__PURE__*/_react.default.createElement("label", {
-  className: "InputFile__button",
-  htmlFor: "upload"
-}, "Search"), /*#__PURE__*/_react.default.createElement("input", {
-  className: "InputFile__input",
-  id: "upload",
-  type: "file",
-  name: name,
-  value: value,
-  onChange: onChange,
-  required: required,
-  accept: accept
-}), /*#__PURE__*/_react.default.createElement("p", {
-  className: (0, _classnames.default)('InputFile__fileName', {
-    'InputFile__fileName--empty': !fileName
-  })
-}, fileName || 'No photo'), err && /*#__PURE__*/_react.default.createElement("p", {
-  className: "InputFile__err"
-}, err));
-
-var _default = Input;
-exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./InputFile.scss":"components/InputFile.scss"}],"components/Textarea.scss":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./Input.scss":"components/Input.scss"}],"components/Textarea.scss":[function(require,module,exports) {
 var reloadCSS = require('_css_loader');
 
 module.hot.dispose(reloadCSS);
@@ -37942,7 +37883,7 @@ const getFeed = () => dispatch => {};
 
 exports.getFeed = getFeed;
 
-const uploadPhoto = (file, fileName, location, caption) => dispatch => {
+const uploadPhoto = (file, fileName, title) => dispatch => {
   const reader = new window.FileReader();
   reader.readAsArrayBuffer(file);
 
@@ -37984,8 +37925,6 @@ var _imageCompression = _interopRequireDefault(require("../utils/imageCompressio
 var _ui = _interopRequireDefault(require("../utils/ui"));
 
 var _Input = _interopRequireDefault(require("./Input"));
-
-var _InputFile = _interopRequireDefault(require("./InputFile"));
 
 var _Textarea = _interopRequireDefault(require("./Textarea"));
 
@@ -38075,38 +38014,30 @@ class UploadPhoto extends _react.Component {
   render() {
     const {
       fileName,
-      location,
-      caption,
+      title,
       isCompressing,
       warningMessage
     } = this.state;
     return /*#__PURE__*/_react.default.createElement("form", {
       className: "UploadPhoto",
       onSubmit: this.handleSubmit
-    }, /*#__PURE__*/_react.default.createElement(_InputFile.default, {
+    }, /*#__PURE__*/_react.default.createElement("input", {
       className: "UploadPhoto__file",
+      id: "upload",
+      type: "file",
       name: "file",
       label: "Search file",
-      fileName: isCompressing ? 'Compressing image...' : fileName,
       onChange: this.handleFileChange,
       err: warningMessage,
       accept: ".png, .jpg, .jpeg",
       required: true
-    }), /*#__PURE__*/_react.default.createElement(_Input.default, {
-      className: "UploadPhoto__location",
-      name: "location",
-      label: "Location",
-      value: location,
-      onChange: this.handleInputChange,
-      placeholder: "Where did you take this photo?",
-      required: true
     }), /*#__PURE__*/_react.default.createElement(_Textarea.default, {
       className: "UploadPhoto__caption",
-      name: "caption",
-      value: caption,
-      label: "Caption",
+      name: "title",
+      value: title,
+      label: "Title",
       onChange: this.handleInputChange,
-      placeholder: "Upload your memories",
+      placeholder: "Your todo",
       required: true
     }), /*#__PURE__*/_react.default.createElement(_Button.default, {
       className: "UploadPhoto__upload",
@@ -38118,13 +38049,13 @@ class UploadPhoto extends _react.Component {
 }
 
 const mapDispatchToProps = dispatch => ({
-  uploadPhoto: (file, fileName, location, caption) => dispatch(photoActions.uploadPhoto(file, fileName, location, caption))
+  uploadPhoto: (file, fileName, title) => dispatch(photoActions.uploadPhoto(file, fileName, title))
 });
 
 var _default = (0, _reactRedux.connect)(null, mapDispatchToProps)(UploadPhoto);
 
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/imageCompression":"utils/imageCompression.js","../utils/ui":"utils/ui.js","./Input":"components/Input.js","./InputFile":"components/InputFile.js","./Textarea":"components/Textarea.js","./Button":"components/Button.js","../redux/actions/photos":"redux/actions/photos.js","./UploadPhoto.scss":"components/UploadPhoto.scss"}],"components/UploadButton.scss":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/imageCompression":"utils/imageCompression.js","../utils/ui":"utils/ui.js","./Input":"components/Input.js","./Textarea":"components/Textarea.js","./Button":"components/Button.js","../redux/actions/photos":"redux/actions/photos.js","./UploadPhoto.scss":"components/UploadPhoto.scss"}],"components/UploadButton.scss":[function(require,module,exports) {
 var reloadCSS = require('_css_loader');
 
 module.hot.dispose(reloadCSS);
@@ -38153,7 +38084,7 @@ const UploadButton = () => /*#__PURE__*/_react.default.createElement("button", {
     header: 'Upload Photo',
     content: /*#__PURE__*/_react.default.createElement(_UploadPhoto.default, null)
   })
-}, "Upload photo");
+}, "New");
 
 var _default = UploadButton;
 exports.default = _default;
@@ -65222,7 +65153,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58030" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56087" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

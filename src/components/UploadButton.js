@@ -12,7 +12,7 @@ const UploadButton = () => (
       content: <UploadPhoto />,
     })}
   >
-    Upload photo
+    New
   </button>
 )
 

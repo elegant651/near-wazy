@@ -3,7 +3,6 @@ import { connect } from 'react-redux'
 import imageCompression from '../utils/imageCompression';
 import ui from '../utils/ui'
 import Input from './Input'
-import InputFile from './InputFile'
 import Textarea from './Textarea'
 import Button from './Button'
 
@@ -70,35 +69,27 @@ class UploadPhoto extends Component {
   }
 
   render() {
-    const { fileName, location, caption, isCompressing, warningMessage } = this.state
+    const { fileName, title, isCompressing, warningMessage } = this.state
     return (
       <form className="UploadPhoto" onSubmit={this.handleSubmit}>
-        <InputFile
+        <input
           className="UploadPhoto__file"
+          id="upload"
+          type="file"
           name="file"
-          label="Search file"
-          fileName={isCompressing ? 'Compressing image...' : fileName}
+          label="Search file"          
           onChange={this.handleFileChange}
           err={warningMessage}
           accept=".png, .jpg, .jpeg"
           required
-        />
-        <Input
-          className="UploadPhoto__location"
-          name="location"
-          label="Location"
-          value={location}
-          onChange={this.handleInputChange}
-          placeholder="Where did you take this photo?"
-          required
-        />
+        />        
         <Textarea
           className="UploadPhoto__caption"
-          name="caption"
-          value={caption}
-          label="Caption"
+          name="title"
+          value={title}
+          label="Title"
           onChange={this.handleInputChange}
-          placeholder="Upload your memories"
+          placeholder="Your todo"
           required
         />
         <Button
@@ -112,8 +103,8 @@ class UploadPhoto extends Component {
 }
 
 const mapDispatchToProps = (dispatch) => ({
-  uploadPhoto: (file, fileName, location, caption) =>
-    dispatch(photoActions.uploadPhoto(file, fileName, location, caption)),
+  uploadPhoto: (file, fileName, title) =>
+    dispatch(photoActions.uploadPhoto(file, fileName, title)),
 })
 
 export default connect(null, mapDispatchToProps)(UploadPhoto)

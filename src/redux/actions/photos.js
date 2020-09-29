@@ -32,9 +32,8 @@ export const getFeed = () => (dispatch) => {
 
 export const uploadPhoto = (
   file,
-  fileName,
-  location,
-  caption
+  fileName,  
+  title
 ) => (dispatch) => {
   const reader = new window.FileReader()
   reader.readAsArrayBuffer(file)
