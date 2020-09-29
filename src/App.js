@@ -1,10 +1,9 @@
 import 'regenerator-runtime/runtime'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback } from 'react'
 import FeedPage from './pages/Feeds'
 import Modal from './components/Modal'
 import Toast from './components/Toast'
 import PropTypes from 'prop-types'
-import Big from 'big.js'
 
 
 const App = ({ contract, currentUser, nearConfig, wallet }) => {
@@ -43,6 +42,9 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
         <>
           <p>
             WazyNear is an DApp that can create Todo and prove it to other users.
+          </p>
+          <p>
+            Tech Stack: React, Redux, Near-js, Near-as, IPFS, Near Testnet
           </p>
           <p>
             Sign in to try it out!

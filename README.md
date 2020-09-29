@@ -1,4 +1,4 @@
-Near-Wazy
+# Near-Wazy
 
 Tech Stack
 ===========
@@ -6,8 +6,9 @@ React, Redux, Near-js, Near-as, IPFS, Near Testnet
 
 Link
 ===========
-[App Link]()
-[Video Link](https://google.com)
+[App Link](https://elegant651.github.io/near-wazy/)
+//
+[Video Link](https://youtu.be/WQD0kN-9cok)
 
 
 Quick Start
