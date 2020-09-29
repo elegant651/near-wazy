@@ -1,7 +1,7 @@
 import React from 'react'
 import cx from 'classnames'
 import ui from '../utils/ui'
-import IconButton from './IconButton'
+import Button from './Button'
 import TransferOwnership from './TransferOwnership'
 
 const TransferOwnershipButton = ({
@@ -10,9 +10,8 @@ const TransferOwnershipButton = ({
   currentOwner,
   className,
 }) => (
-  <IconButton
-    className={cx('TransferOwnershipButton', className)}
-    icon="icon-transfer.png"
+  <Button
+    className={cx('TransferOwnershipButton', className)}    
     alt="Transfer Ownership"
     onClick={() => ui.showModal({
       header: 'Transfer Ownership',

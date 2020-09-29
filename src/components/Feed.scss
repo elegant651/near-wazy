@@ -1,6 +1,7 @@
 .Feed {
     position: relative;
     width: 100%;
+    max-width: 500px;
     min-height: 100%;
     padding: 60px 0;
     display: flex;
@@ -11,8 +12,9 @@
   .FeedPhoto {
     position: relative;
     width: 100%;
-    max-width: 600px;
+    max-width: 450px;
     margin-bottom: 60px;
+    border: 1px solid #000;
     &:last-child { margin-bottom: 0; }    
   }
   
@@ -25,15 +27,6 @@
     position: relative;
     padding: 24px 24px 40px 24px;
   }
-  
-  .FeedPhoto__copyrightInfo,
-  .FeedPhoto__transferOwnership {
-    position: absolute;
-    top: 20px;
-  }
-  
-  .FeedPhoto__copyrightInfo { right: 24px; }
-  .FeedPhoto__transferOwnership { right: 64px; }
   
   .Feed__empty {
     font-size: 20px;

@@ -35799,7 +35799,2741 @@ const Button = ({
 
 var _default = Button;
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./Button.scss":"components/Button.scss"}],"../node_modules/base64-js/index.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./Button.scss":"components/Button.scss"}],"../node_modules/big.js/big.js":[function(require,module,exports) {
+var define;
+/*
+ *  big.js v5.2.2
+ *  A small, fast, easy-to-use library for arbitrary-precision decimal arithmetic.
+ *  Copyright (c) 2018 Michael Mclaughlin <M8ch88l@gmail.com>
+ *  https://github.com/MikeMcl/big.js/LICENCE
+ */
+;(function (GLOBAL) {
+  'use strict';
+  var Big,
+
+
+/************************************** EDITABLE DEFAULTS *****************************************/
+
+
+    // The default values below must be integers within the stated ranges.
+
+    /*
+     * The maximum number of decimal places (DP) of the results of operations involving division:
+     * div and sqrt, and pow with negative exponents.
+     */
+    DP = 20,          // 0 to MAX_DP
+
+    /*
+     * The rounding mode (RM) used when rounding to the above decimal places.
+     *
+     *  0  Towards zero (i.e. truncate, no rounding).       (ROUND_DOWN)
+     *  1  To nearest neighbour. If equidistant, round up.  (ROUND_HALF_UP)
+     *  2  To nearest neighbour. If equidistant, to even.   (ROUND_HALF_EVEN)
+     *  3  Away from zero.                                  (ROUND_UP)
+     */
+    RM = 1,             // 0, 1, 2 or 3
+
+    // The maximum value of DP and Big.DP.
+    MAX_DP = 1E6,       // 0 to 1000000
+
+    // The maximum magnitude of the exponent argument to the pow method.
+    MAX_POWER = 1E6,    // 1 to 1000000
+
+    /*
+     * The negative exponent (NE) at and beneath which toString returns exponential notation.
+     * (JavaScript numbers: -7)
+     * -1000000 is the minimum recommended exponent value of a Big.
+     */
+    NE = -7,            // 0 to -1000000
+
+    /*
+     * The positive exponent (PE) at and above which toString returns exponential notation.
+     * (JavaScript numbers: 21)
+     * 1000000 is the maximum recommended exponent value of a Big.
+     * (This limit is not enforced or checked.)
+     */
+    PE = 21,            // 0 to 1000000
+
+
+/**************************************************************************************************/
+
+
+    // Error messages.
+    NAME = '[big.js] ',
+    INVALID = NAME + 'Invalid ',
+    INVALID_DP = INVALID + 'decimal places',
+    INVALID_RM = INVALID + 'rounding mode',
+    DIV_BY_ZERO = NAME + 'Division by zero',
+
+    // The shared prototype object.
+    P = {},
+    UNDEFINED = void 0,
+    NUMERIC = /^-?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i;
+
+
+  /*
+   * Create and return a Big constructor.
+   *
+   */
+  function _Big_() {
+
+    /*
+     * The Big constructor and exported function.
+     * Create and return a new instance of a Big number object.
+     *
+     * n {number|string|Big} A numeric value.
+     */
+    function Big(n) {
+      var x = this;
+
+      // Enable constructor usage without new.
+      if (!(x instanceof Big)) return n === UNDEFINED ? _Big_() : new Big(n);
+
+      // Duplicate.
+      if (n instanceof Big) {
+        x.s = n.s;
+        x.e = n.e;
+        x.c = n.c.slice();
+      } else {
+        parse(x, n);
+      }
+
+      /*
+       * Retain a reference to this Big constructor, and shadow Big.prototype.constructor which
+       * points to Object.
+       */
+      x.constructor = Big;
+    }
+
+    Big.prototype = P;
+    Big.DP = DP;
+    Big.RM = RM;
+    Big.NE = NE;
+    Big.PE = PE;
+    Big.version = '5.2.2';
+
+    return Big;
+  }
+
+
+  /*
+   * Parse the number or string value passed to a Big constructor.
+   *
+   * x {Big} A Big number instance.
+   * n {number|string} A numeric value.
+   */
+  function parse(x, n) {
+    var e, i, nl;
+
+    // Minus zero?
+    if (n === 0 && 1 / n < 0) n = '-0';
+    else if (!NUMERIC.test(n += '')) throw Error(INVALID + 'number');
+
+    // Determine sign.
+    x.s = n.charAt(0) == '-' ? (n = n.slice(1), -1) : 1;
+
+    // Decimal point?
+    if ((e = n.indexOf('.')) > -1) n = n.replace('.', '');
+
+    // Exponential form?
+    if ((i = n.search(/e/i)) > 0) {
+
+      // Determine exponent.
+      if (e < 0) e = i;
+      e += +n.slice(i + 1);
+      n = n.substring(0, i);
+    } else if (e < 0) {
+
+      // Integer.
+      e = n.length;
+    }
+
+    nl = n.length;
+
+    // Determine leading zeros.
+    for (i = 0; i < nl && n.charAt(i) == '0';) ++i;
+
+    if (i == nl) {
+
+      // Zero.
+      x.c = [x.e = 0];
+    } else {
+
+      // Determine trailing zeros.
+      for (; nl > 0 && n.charAt(--nl) == '0';);
+      x.e = e - i - 1;
+      x.c = [];
+
+      // Convert string to array of digits without leading/trailing zeros.
+      for (e = 0; i <= nl;) x.c[e++] = +n.charAt(i++);
+    }
+
+    return x;
+  }
+
+
+  /*
+   * Round Big x to a maximum of dp decimal places using rounding mode rm.
+   * Called by stringify, P.div, P.round and P.sqrt.
+   *
+   * x {Big} The Big to round.
+   * dp {number} Integer, 0 to MAX_DP inclusive.
+   * rm {number} 0, 1, 2 or 3 (DOWN, HALF_UP, HALF_EVEN, UP)
+   * [more] {boolean} Whether the result of division was truncated.
+   */
+  function round(x, dp, rm, more) {
+    var xc = x.c,
+      i = x.e + dp + 1;
+
+    if (i < xc.length) {
+      if (rm === 1) {
+
+        // xc[i] is the digit after the digit that may be rounded up.
+        more = xc[i] >= 5;
+      } else if (rm === 2) {
+        more = xc[i] > 5 || xc[i] == 5 &&
+          (more || i < 0 || xc[i + 1] !== UNDEFINED || xc[i - 1] & 1);
+      } else if (rm === 3) {
+        more = more || !!xc[0];
+      } else {
+        more = false;
+        if (rm !== 0) throw Error(INVALID_RM);
+      }
+
+      if (i < 1) {
+        xc.length = 1;
+
+        if (more) {
+
+          // 1, 0.1, 0.01, 0.001, 0.0001 etc.
+          x.e = -dp;
+          xc[0] = 1;
+        } else {
+
+          // Zero.
+          xc[0] = x.e = 0;
+        }
+      } else {
+
+        // Remove any digits after the required decimal places.
+        xc.length = i--;
+
+        // Round up?
+        if (more) {
+
+          // Rounding up may mean the previous digit has to be rounded up.
+          for (; ++xc[i] > 9;) {
+            xc[i] = 0;
+            if (!i--) {
+              ++x.e;
+              xc.unshift(1);
+            }
+          }
+        }
+
+        // Remove trailing zeros.
+        for (i = xc.length; !xc[--i];) xc.pop();
+      }
+    } else if (rm < 0 || rm > 3 || rm !== ~~rm) {
+      throw Error(INVALID_RM);
+    }
+
+    return x;
+  }
+
+
+  /*
+   * Return a string representing the value of Big x in normal or exponential notation.
+   * Handles P.toExponential, P.toFixed, P.toJSON, P.toPrecision, P.toString and P.valueOf.
+   *
+   * x {Big}
+   * id? {number} Caller id.
+   *         1 toExponential
+   *         2 toFixed
+   *         3 toPrecision
+   *         4 valueOf
+   * n? {number|undefined} Caller's argument.
+   * k? {number|undefined}
+   */
+  function stringify(x, id, n, k) {
+    var e, s,
+      Big = x.constructor,
+      z = !x.c[0];
+
+    if (n !== UNDEFINED) {
+      if (n !== ~~n || n < (id == 3) || n > MAX_DP) {
+        throw Error(id == 3 ? INVALID + 'precision' : INVALID_DP);
+      }
+
+      x = new Big(x);
+
+      // The index of the digit that may be rounded up.
+      n = k - x.e;
+
+      // Round?
+      if (x.c.length > ++k) round(x, n, Big.RM);
+
+      // toFixed: recalculate k as x.e may have changed if value rounded up.
+      if (id == 2) k = x.e + n + 1;
+
+      // Append zeros?
+      for (; x.c.length < k;) x.c.push(0);
+    }
+
+    e = x.e;
+    s = x.c.join('');
+    n = s.length;
+
+    // Exponential notation?
+    if (id != 2 && (id == 1 || id == 3 && k <= e || e <= Big.NE || e >= Big.PE)) {
+      s = s.charAt(0) + (n > 1 ? '.' + s.slice(1) : '') + (e < 0 ? 'e' : 'e+') + e;
+
+    // Normal notation.
+    } else if (e < 0) {
+      for (; ++e;) s = '0' + s;
+      s = '0.' + s;
+    } else if (e > 0) {
+      if (++e > n) for (e -= n; e--;) s += '0';
+      else if (e < n) s = s.slice(0, e) + '.' + s.slice(e);
+    } else if (n > 1) {
+      s = s.charAt(0) + '.' + s.slice(1);
+    }
+
+    return x.s < 0 && (!z || id == 4) ? '-' + s : s;
+  }
+
+
+  // Prototype/instance methods
+
+
+  /*
+   * Return a new Big whose value is the absolute value of this Big.
+   */
+  P.abs = function () {
+    var x = new this.constructor(this);
+    x.s = 1;
+    return x;
+  };
+
+
+  /*
+   * Return 1 if the value of this Big is greater than the value of Big y,
+   *       -1 if the value of this Big is less than the value of Big y, or
+   *        0 if they have the same value.
+  */
+  P.cmp = function (y) {
+    var isneg,
+      x = this,
+      xc = x.c,
+      yc = (y = new x.constructor(y)).c,
+      i = x.s,
+      j = y.s,
+      k = x.e,
+      l = y.e;
+
+    // Either zero?
+    if (!xc[0] || !yc[0]) return !xc[0] ? !yc[0] ? 0 : -j : i;
+
+    // Signs differ?
+    if (i != j) return i;
+
+    isneg = i < 0;
+
+    // Compare exponents.
+    if (k != l) return k > l ^ isneg ? 1 : -1;
+
+    j = (k = xc.length) < (l = yc.length) ? k : l;
+
+    // Compare digit by digit.
+    for (i = -1; ++i < j;) {
+      if (xc[i] != yc[i]) return xc[i] > yc[i] ^ isneg ? 1 : -1;
+    }
+
+    // Compare lengths.
+    return k == l ? 0 : k > l ^ isneg ? 1 : -1;
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big divided by the value of Big y, rounded,
+   * if necessary, to a maximum of Big.DP decimal places using rounding mode Big.RM.
+   */
+  P.div = function (y) {
+    var x = this,
+      Big = x.constructor,
+      a = x.c,                  // dividend
+      b = (y = new Big(y)).c,   // divisor
+      k = x.s == y.s ? 1 : -1,
+      dp = Big.DP;
+
+    if (dp !== ~~dp || dp < 0 || dp > MAX_DP) throw Error(INVALID_DP);
+
+    // Divisor is zero?
+    if (!b[0]) throw Error(DIV_BY_ZERO);
+
+    // Dividend is 0? Return +-0.
+    if (!a[0]) return new Big(k * 0);
+
+    var bl, bt, n, cmp, ri,
+      bz = b.slice(),
+      ai = bl = b.length,
+      al = a.length,
+      r = a.slice(0, bl),   // remainder
+      rl = r.length,
+      q = y,                // quotient
+      qc = q.c = [],
+      qi = 0,
+      d = dp + (q.e = x.e - y.e) + 1;    // number of digits of the result
+
+    q.s = k;
+    k = d < 0 ? 0 : d;
+
+    // Create version of divisor with leading zero.
+    bz.unshift(0);
+
+    // Add zeros to make remainder as long as divisor.
+    for (; rl++ < bl;) r.push(0);
+
+    do {
+
+      // n is how many times the divisor goes into current remainder.
+      for (n = 0; n < 10; n++) {
+
+        // Compare divisor and remainder.
+        if (bl != (rl = r.length)) {
+          cmp = bl > rl ? 1 : -1;
+        } else {
+          for (ri = -1, cmp = 0; ++ri < bl;) {
+            if (b[ri] != r[ri]) {
+              cmp = b[ri] > r[ri] ? 1 : -1;
+              break;
+            }
+          }
+        }
+
+        // If divisor < remainder, subtract divisor from remainder.
+        if (cmp < 0) {
+
+          // Remainder can't be more than 1 digit longer than divisor.
+          // Equalise lengths using divisor with extra leading zero?
+          for (bt = rl == bl ? b : bz; rl;) {
+            if (r[--rl] < bt[rl]) {
+              ri = rl;
+              for (; ri && !r[--ri];) r[ri] = 9;
+              --r[ri];
+              r[rl] += 10;
+            }
+            r[rl] -= bt[rl];
+          }
+
+          for (; !r[0];) r.shift();
+        } else {
+          break;
+        }
+      }
+
+      // Add the digit n to the result array.
+      qc[qi++] = cmp ? n : ++n;
+
+      // Update the remainder.
+      if (r[0] && cmp) r[rl] = a[ai] || 0;
+      else r = [a[ai]];
+
+    } while ((ai++ < al || r[0] !== UNDEFINED) && k--);
+
+    // Leading zero? Do not remove if result is simply zero (qi == 1).
+    if (!qc[0] && qi != 1) {
+
+      // There can't be more than one zero.
+      qc.shift();
+      q.e--;
+    }
+
+    // Round?
+    if (qi > d) round(q, dp, Big.RM, r[0] !== UNDEFINED);
+
+    return q;
+  };
+
+
+  /*
+   * Return true if the value of this Big is equal to the value of Big y, otherwise return false.
+   */
+  P.eq = function (y) {
+    return !this.cmp(y);
+  };
+
+
+  /*
+   * Return true if the value of this Big is greater than the value of Big y, otherwise return
+   * false.
+   */
+  P.gt = function (y) {
+    return this.cmp(y) > 0;
+  };
+
+
+  /*
+   * Return true if the value of this Big is greater than or equal to the value of Big y, otherwise
+   * return false.
+   */
+  P.gte = function (y) {
+    return this.cmp(y) > -1;
+  };
+
+
+  /*
+   * Return true if the value of this Big is less than the value of Big y, otherwise return false.
+   */
+  P.lt = function (y) {
+    return this.cmp(y) < 0;
+  };
+
+
+  /*
+   * Return true if the value of this Big is less than or equal to the value of Big y, otherwise
+   * return false.
+   */
+  P.lte = function (y) {
+    return this.cmp(y) < 1;
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big minus the value of Big y.
+   */
+  P.minus = P.sub = function (y) {
+    var i, j, t, xlty,
+      x = this,
+      Big = x.constructor,
+      a = x.s,
+      b = (y = new Big(y)).s;
+
+    // Signs differ?
+    if (a != b) {
+      y.s = -b;
+      return x.plus(y);
+    }
+
+    var xc = x.c.slice(),
+      xe = x.e,
+      yc = y.c,
+      ye = y.e;
+
+    // Either zero?
+    if (!xc[0] || !yc[0]) {
+
+      // y is non-zero? x is non-zero? Or both are zero.
+      return yc[0] ? (y.s = -b, y) : new Big(xc[0] ? x : 0);
+    }
+
+    // Determine which is the bigger number. Prepend zeros to equalise exponents.
+    if (a = xe - ye) {
+
+      if (xlty = a < 0) {
+        a = -a;
+        t = xc;
+      } else {
+        ye = xe;
+        t = yc;
+      }
+
+      t.reverse();
+      for (b = a; b--;) t.push(0);
+      t.reverse();
+    } else {
+
+      // Exponents equal. Check digit by digit.
+      j = ((xlty = xc.length < yc.length) ? xc : yc).length;
+
+      for (a = b = 0; b < j; b++) {
+        if (xc[b] != yc[b]) {
+          xlty = xc[b] < yc[b];
+          break;
+        }
+      }
+    }
+
+    // x < y? Point xc to the array of the bigger number.
+    if (xlty) {
+      t = xc;
+      xc = yc;
+      yc = t;
+      y.s = -y.s;
+    }
+
+    /*
+     * Append zeros to xc if shorter. No need to add zeros to yc if shorter as subtraction only
+     * needs to start at yc.length.
+     */
+    if ((b = (j = yc.length) - (i = xc.length)) > 0) for (; b--;) xc[i++] = 0;
+
+    // Subtract yc from xc.
+    for (b = i; j > a;) {
+      if (xc[--j] < yc[j]) {
+        for (i = j; i && !xc[--i];) xc[i] = 9;
+        --xc[i];
+        xc[j] += 10;
+      }
+
+      xc[j] -= yc[j];
+    }
+
+    // Remove trailing zeros.
+    for (; xc[--b] === 0;) xc.pop();
+
+    // Remove leading zeros and adjust exponent accordingly.
+    for (; xc[0] === 0;) {
+      xc.shift();
+      --ye;
+    }
+
+    if (!xc[0]) {
+
+      // n - n = +0
+      y.s = 1;
+
+      // Result must be zero.
+      xc = [ye = 0];
+    }
+
+    y.c = xc;
+    y.e = ye;
+
+    return y;
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big modulo the value of Big y.
+   */
+  P.mod = function (y) {
+    var ygtx,
+      x = this,
+      Big = x.constructor,
+      a = x.s,
+      b = (y = new Big(y)).s;
+
+    if (!y.c[0]) throw Error(DIV_BY_ZERO);
+
+    x.s = y.s = 1;
+    ygtx = y.cmp(x) == 1;
+    x.s = a;
+    y.s = b;
+
+    if (ygtx) return new Big(x);
+
+    a = Big.DP;
+    b = Big.RM;
+    Big.DP = Big.RM = 0;
+    x = x.div(y);
+    Big.DP = a;
+    Big.RM = b;
+
+    return this.minus(x.times(y));
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big plus the value of Big y.
+   */
+  P.plus = P.add = function (y) {
+    var t,
+      x = this,
+      Big = x.constructor,
+      a = x.s,
+      b = (y = new Big(y)).s;
+
+    // Signs differ?
+    if (a != b) {
+      y.s = -b;
+      return x.minus(y);
+    }
+
+    var xe = x.e,
+      xc = x.c,
+      ye = y.e,
+      yc = y.c;
+
+    // Either zero? y is non-zero? x is non-zero? Or both are zero.
+    if (!xc[0] || !yc[0]) return yc[0] ? y : new Big(xc[0] ? x : a * 0);
+
+    xc = xc.slice();
+
+    // Prepend zeros to equalise exponents.
+    // Note: reverse faster than unshifts.
+    if (a = xe - ye) {
+      if (a > 0) {
+        ye = xe;
+        t = yc;
+      } else {
+        a = -a;
+        t = xc;
+      }
+
+      t.reverse();
+      for (; a--;) t.push(0);
+      t.reverse();
+    }
+
+    // Point xc to the longer array.
+    if (xc.length - yc.length < 0) {
+      t = yc;
+      yc = xc;
+      xc = t;
+    }
+
+    a = yc.length;
+
+    // Only start adding at yc.length - 1 as the further digits of xc can be left as they are.
+    for (b = 0; a; xc[a] %= 10) b = (xc[--a] = xc[a] + yc[a] + b) / 10 | 0;
+
+    // No need to check for zero, as +x + +y != 0 && -x + -y != 0
+
+    if (b) {
+      xc.unshift(b);
+      ++ye;
+    }
+
+    // Remove trailing zeros.
+    for (a = xc.length; xc[--a] === 0;) xc.pop();
+
+    y.c = xc;
+    y.e = ye;
+
+    return y;
+  };
+
+
+  /*
+   * Return a Big whose value is the value of this Big raised to the power n.
+   * If n is negative, round to a maximum of Big.DP decimal places using rounding
+   * mode Big.RM.
+   *
+   * n {number} Integer, -MAX_POWER to MAX_POWER inclusive.
+   */
+  P.pow = function (n) {
+    var x = this,
+      one = new x.constructor(1),
+      y = one,
+      isneg = n < 0;
+
+    if (n !== ~~n || n < -MAX_POWER || n > MAX_POWER) throw Error(INVALID + 'exponent');
+    if (isneg) n = -n;
+
+    for (;;) {
+      if (n & 1) y = y.times(x);
+      n >>= 1;
+      if (!n) break;
+      x = x.times(x);
+    }
+
+    return isneg ? one.div(y) : y;
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big rounded using rounding mode rm
+   * to a maximum of dp decimal places, or, if dp is negative, to an integer which is a
+   * multiple of 10**-dp.
+   * If dp is not specified, round to 0 decimal places.
+   * If rm is not specified, use Big.RM.
+   *
+   * dp? {number} Integer, -MAX_DP to MAX_DP inclusive.
+   * rm? 0, 1, 2 or 3 (ROUND_DOWN, ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_UP)
+   */
+  P.round = function (dp, rm) {
+    var Big = this.constructor;
+    if (dp === UNDEFINED) dp = 0;
+    else if (dp !== ~~dp || dp < -MAX_DP || dp > MAX_DP) throw Error(INVALID_DP);
+    return round(new Big(this), dp, rm === UNDEFINED ? Big.RM : rm);
+  };
+
+
+  /*
+   * Return a new Big whose value is the square root of the value of this Big, rounded, if
+   * necessary, to a maximum of Big.DP decimal places using rounding mode Big.RM.
+   */
+  P.sqrt = function () {
+    var r, c, t,
+      x = this,
+      Big = x.constructor,
+      s = x.s,
+      e = x.e,
+      half = new Big(0.5);
+
+    // Zero?
+    if (!x.c[0]) return new Big(x);
+
+    // Negative?
+    if (s < 0) throw Error(NAME + 'No square root');
+
+    // Estimate.
+    s = Math.sqrt(x + '');
+
+    // Math.sqrt underflow/overflow?
+    // Re-estimate: pass x coefficient to Math.sqrt as integer, then adjust the result exponent.
+    if (s === 0 || s === 1 / 0) {
+      c = x.c.join('');
+      if (!(c.length + e & 1)) c += '0';
+      s = Math.sqrt(c);
+      e = ((e + 1) / 2 | 0) - (e < 0 || e & 1);
+      r = new Big((s == 1 / 0 ? '1e' : (s = s.toExponential()).slice(0, s.indexOf('e') + 1)) + e);
+    } else {
+      r = new Big(s);
+    }
+
+    e = r.e + (Big.DP += 4);
+
+    // Newton-Raphson iteration.
+    do {
+      t = r;
+      r = half.times(t.plus(x.div(t)));
+    } while (t.c.slice(0, e).join('') !== r.c.slice(0, e).join(''));
+
+    return round(r, Big.DP -= 4, Big.RM);
+  };
+
+
+  /*
+   * Return a new Big whose value is the value of this Big times the value of Big y.
+   */
+  P.times = P.mul = function (y) {
+    var c,
+      x = this,
+      Big = x.constructor,
+      xc = x.c,
+      yc = (y = new Big(y)).c,
+      a = xc.length,
+      b = yc.length,
+      i = x.e,
+      j = y.e;
+
+    // Determine sign of result.
+    y.s = x.s == y.s ? 1 : -1;
+
+    // Return signed 0 if either 0.
+    if (!xc[0] || !yc[0]) return new Big(y.s * 0);
+
+    // Initialise exponent of result as x.e + y.e.
+    y.e = i + j;
+
+    // If array xc has fewer digits than yc, swap xc and yc, and lengths.
+    if (a < b) {
+      c = xc;
+      xc = yc;
+      yc = c;
+      j = a;
+      a = b;
+      b = j;
+    }
+
+    // Initialise coefficient array of result with zeros.
+    for (c = new Array(j = a + b); j--;) c[j] = 0;
+
+    // Multiply.
+
+    // i is initially xc.length.
+    for (i = b; i--;) {
+      b = 0;
+
+      // a is yc.length.
+      for (j = a + i; j > i;) {
+
+        // Current sum of products at this digit position, plus carry.
+        b = c[j] + yc[i] * xc[j - i - 1] + b;
+        c[j--] = b % 10;
+
+        // carry
+        b = b / 10 | 0;
+      }
+
+      c[j] = (c[j] + b) % 10;
+    }
+
+    // Increment result exponent if there is a final carry, otherwise remove leading zero.
+    if (b) ++y.e;
+    else c.shift();
+
+    // Remove trailing zeros.
+    for (i = c.length; !c[--i];) c.pop();
+    y.c = c;
+
+    return y;
+  };
+
+
+  /*
+   * Return a string representing the value of this Big in exponential notation to dp fixed decimal
+   * places and rounded using Big.RM.
+   *
+   * dp? {number} Integer, 0 to MAX_DP inclusive.
+   */
+  P.toExponential = function (dp) {
+    return stringify(this, 1, dp, dp);
+  };
+
+
+  /*
+   * Return a string representing the value of this Big in normal notation to dp fixed decimal
+   * places and rounded using Big.RM.
+   *
+   * dp? {number} Integer, 0 to MAX_DP inclusive.
+   *
+   * (-0).toFixed(0) is '0', but (-0.1).toFixed(0) is '-0'.
+   * (-0).toFixed(1) is '0.0', but (-0.01).toFixed(1) is '-0.0'.
+   */
+  P.toFixed = function (dp) {
+    return stringify(this, 2, dp, this.e + dp);
+  };
+
+
+  /*
+   * Return a string representing the value of this Big rounded to sd significant digits using
+   * Big.RM. Use exponential notation if sd is less than the number of digits necessary to represent
+   * the integer part of the value in normal notation.
+   *
+   * sd {number} Integer, 1 to MAX_DP inclusive.
+   */
+  P.toPrecision = function (sd) {
+    return stringify(this, 3, sd, sd - 1);
+  };
+
+
+  /*
+   * Return a string representing the value of this Big.
+   * Return exponential notation if this Big has a positive exponent equal to or greater than
+   * Big.PE, or a negative exponent equal to or less than Big.NE.
+   * Omit the sign for negative zero.
+   */
+  P.toString = function () {
+    return stringify(this);
+  };
+
+
+  /*
+   * Return a string representing the value of this Big.
+   * Return exponential notation if this Big has a positive exponent equal to or greater than
+   * Big.PE, or a negative exponent equal to or less than Big.NE.
+   * Include the sign for negative zero.
+   */
+  P.valueOf = P.toJSON = function () {
+    return stringify(this, 4);
+  };
+
+
+  // Export
+
+
+  Big = _Big_();
+
+  Big['default'] = Big.Big = Big;
+
+  //AMD.
+  if (typeof define === 'function' && define.amd) {
+    define(function () { return Big; });
+
+  // Node and other CommonJS-like environments that support module.exports.
+  } else if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Big;
+
+  //Browser.
+  } else {
+    GLOBAL.Big = Big;
+  }
+})(this);
+
+},{}],"../node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
+'use strict';
+
+module.exports = function bind(fn, thisArg) {
+  return function wrap() {
+    var args = new Array(arguments.length);
+    for (var i = 0; i < args.length; i++) {
+      args[i] = arguments[i];
+    }
+    return fn.apply(thisArg, args);
+  };
+};
+
+},{}],"../node_modules/axios/lib/utils.js":[function(require,module,exports) {
+'use strict';
+
+var bind = require('./helpers/bind');
+
+/*global toString:true*/
+
+// utils is a library of generic helper functions non-specific to axios
+
+var toString = Object.prototype.toString;
+
+/**
+ * Determine if a value is an Array
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Array, otherwise false
+ */
+function isArray(val) {
+  return toString.call(val) === '[object Array]';
+}
+
+/**
+ * Determine if a value is undefined
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if the value is undefined, otherwise false
+ */
+function isUndefined(val) {
+  return typeof val === 'undefined';
+}
+
+/**
+ * Determine if a value is a Buffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Buffer, otherwise false
+ */
+function isBuffer(val) {
+  return val !== null && !isUndefined(val) && val.constructor !== null && !isUndefined(val.constructor)
+    && typeof val.constructor.isBuffer === 'function' && val.constructor.isBuffer(val);
+}
+
+/**
+ * Determine if a value is an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an ArrayBuffer, otherwise false
+ */
+function isArrayBuffer(val) {
+  return toString.call(val) === '[object ArrayBuffer]';
+}
+
+/**
+ * Determine if a value is a FormData
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an FormData, otherwise false
+ */
+function isFormData(val) {
+  return (typeof FormData !== 'undefined') && (val instanceof FormData);
+}
+
+/**
+ * Determine if a value is a view on an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a view on an ArrayBuffer, otherwise false
+ */
+function isArrayBufferView(val) {
+  var result;
+  if ((typeof ArrayBuffer !== 'undefined') && (ArrayBuffer.isView)) {
+    result = ArrayBuffer.isView(val);
+  } else {
+    result = (val) && (val.buffer) && (val.buffer instanceof ArrayBuffer);
+  }
+  return result;
+}
+
+/**
+ * Determine if a value is a String
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a String, otherwise false
+ */
+function isString(val) {
+  return typeof val === 'string';
+}
+
+/**
+ * Determine if a value is a Number
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Number, otherwise false
+ */
+function isNumber(val) {
+  return typeof val === 'number';
+}
+
+/**
+ * Determine if a value is an Object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Object, otherwise false
+ */
+function isObject(val) {
+  return val !== null && typeof val === 'object';
+}
+
+/**
+ * Determine if a value is a plain Object
+ *
+ * @param {Object} val The value to test
+ * @return {boolean} True if value is a plain Object, otherwise false
+ */
+function isPlainObject(val) {
+  if (toString.call(val) !== '[object Object]') {
+    return false;
+  }
+
+  var prototype = Object.getPrototypeOf(val);
+  return prototype === null || prototype === Object.prototype;
+}
+
+/**
+ * Determine if a value is a Date
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Date, otherwise false
+ */
+function isDate(val) {
+  return toString.call(val) === '[object Date]';
+}
+
+/**
+ * Determine if a value is a File
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+function isFile(val) {
+  return toString.call(val) === '[object File]';
+}
+
+/**
+ * Determine if a value is a Blob
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Blob, otherwise false
+ */
+function isBlob(val) {
+  return toString.call(val) === '[object Blob]';
+}
+
+/**
+ * Determine if a value is a Function
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Function, otherwise false
+ */
+function isFunction(val) {
+  return toString.call(val) === '[object Function]';
+}
+
+/**
+ * Determine if a value is a Stream
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Stream, otherwise false
+ */
+function isStream(val) {
+  return isObject(val) && isFunction(val.pipe);
+}
+
+/**
+ * Determine if a value is a URLSearchParams object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a URLSearchParams object, otherwise false
+ */
+function isURLSearchParams(val) {
+  return typeof URLSearchParams !== 'undefined' && val instanceof URLSearchParams;
+}
+
+/**
+ * Trim excess whitespace off the beginning and end of a string
+ *
+ * @param {String} str The String to trim
+ * @returns {String} The String freed of excess whitespace
+ */
+function trim(str) {
+  return str.replace(/^\s*/, '').replace(/\s*$/, '');
+}
+
+/**
+ * Determine if we're running in a standard browser environment
+ *
+ * This allows axios to run in a web worker, and react-native.
+ * Both environments support XMLHttpRequest, but not fully standard globals.
+ *
+ * web workers:
+ *  typeof window -> undefined
+ *  typeof document -> undefined
+ *
+ * react-native:
+ *  navigator.product -> 'ReactNative'
+ * nativescript
+ *  navigator.product -> 'NativeScript' or 'NS'
+ */
+function isStandardBrowserEnv() {
+  if (typeof navigator !== 'undefined' && (navigator.product === 'ReactNative' ||
+                                           navigator.product === 'NativeScript' ||
+                                           navigator.product === 'NS')) {
+    return false;
+  }
+  return (
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined'
+  );
+}
+
+/**
+ * Iterate over an Array or an Object invoking a function for each item.
+ *
+ * If `obj` is an Array callback will be called passing
+ * the value, index, and complete array for each item.
+ *
+ * If 'obj' is an Object callback will be called passing
+ * the value, key, and complete object for each property.
+ *
+ * @param {Object|Array} obj The object to iterate
+ * @param {Function} fn The callback to invoke for each item
+ */
+function forEach(obj, fn) {
+  // Don't bother if no value provided
+  if (obj === null || typeof obj === 'undefined') {
+    return;
+  }
+
+  // Force an array if not already something iterable
+  if (typeof obj !== 'object') {
+    /*eslint no-param-reassign:0*/
+    obj = [obj];
+  }
+
+  if (isArray(obj)) {
+    // Iterate over array values
+    for (var i = 0, l = obj.length; i < l; i++) {
+      fn.call(null, obj[i], i, obj);
+    }
+  } else {
+    // Iterate over object keys
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        fn.call(null, obj[key], key, obj);
+      }
+    }
+  }
+}
+
+/**
+ * Accepts varargs expecting each argument to be an object, then
+ * immutably merges the properties of each object and returns result.
+ *
+ * When multiple objects contain the same key the later object in
+ * the arguments list will take precedence.
+ *
+ * Example:
+ *
+ * ```js
+ * var result = merge({foo: 123}, {foo: 456});
+ * console.log(result.foo); // outputs 456
+ * ```
+ *
+ * @param {Object} obj1 Object to merge
+ * @returns {Object} Result of all merge properties
+ */
+function merge(/* obj1, obj2, obj3, ... */) {
+  var result = {};
+  function assignValue(val, key) {
+    if (isPlainObject(result[key]) && isPlainObject(val)) {
+      result[key] = merge(result[key], val);
+    } else if (isPlainObject(val)) {
+      result[key] = merge({}, val);
+    } else if (isArray(val)) {
+      result[key] = val.slice();
+    } else {
+      result[key] = val;
+    }
+  }
+
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Extends object a by mutably adding to it the properties of object b.
+ *
+ * @param {Object} a The object to be extended
+ * @param {Object} b The object to copy properties from
+ * @param {Object} thisArg The object to bind function to
+ * @return {Object} The resulting value of object a
+ */
+function extend(a, b, thisArg) {
+  forEach(b, function assignValue(val, key) {
+    if (thisArg && typeof val === 'function') {
+      a[key] = bind(val, thisArg);
+    } else {
+      a[key] = val;
+    }
+  });
+  return a;
+}
+
+/**
+ * Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
+ *
+ * @param {string} content with BOM
+ * @return {string} content value without BOM
+ */
+function stripBOM(content) {
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  return content;
+}
+
+module.exports = {
+  isArray: isArray,
+  isArrayBuffer: isArrayBuffer,
+  isBuffer: isBuffer,
+  isFormData: isFormData,
+  isArrayBufferView: isArrayBufferView,
+  isString: isString,
+  isNumber: isNumber,
+  isObject: isObject,
+  isPlainObject: isPlainObject,
+  isUndefined: isUndefined,
+  isDate: isDate,
+  isFile: isFile,
+  isBlob: isBlob,
+  isFunction: isFunction,
+  isStream: isStream,
+  isURLSearchParams: isURLSearchParams,
+  isStandardBrowserEnv: isStandardBrowserEnv,
+  forEach: forEach,
+  merge: merge,
+  extend: extend,
+  trim: trim,
+  stripBOM: stripBOM
+};
+
+},{"./helpers/bind":"../node_modules/axios/lib/helpers/bind.js"}],"../node_modules/axios/lib/helpers/buildURL.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+function encode(val) {
+  return encodeURIComponent(val).
+    replace(/%3A/gi, ':').
+    replace(/%24/g, '$').
+    replace(/%2C/gi, ',').
+    replace(/%20/g, '+').
+    replace(/%5B/gi, '[').
+    replace(/%5D/gi, ']');
+}
+
+/**
+ * Build a URL by appending params to the end
+ *
+ * @param {string} url The base of the url (e.g., http://www.google.com)
+ * @param {object} [params] The params to be appended
+ * @returns {string} The formatted url
+ */
+module.exports = function buildURL(url, params, paramsSerializer) {
+  /*eslint no-param-reassign:0*/
+  if (!params) {
+    return url;
+  }
+
+  var serializedParams;
+  if (paramsSerializer) {
+    serializedParams = paramsSerializer(params);
+  } else if (utils.isURLSearchParams(params)) {
+    serializedParams = params.toString();
+  } else {
+    var parts = [];
+
+    utils.forEach(params, function serialize(val, key) {
+      if (val === null || typeof val === 'undefined') {
+        return;
+      }
+
+      if (utils.isArray(val)) {
+        key = key + '[]';
+      } else {
+        val = [val];
+      }
+
+      utils.forEach(val, function parseValue(v) {
+        if (utils.isDate(v)) {
+          v = v.toISOString();
+        } else if (utils.isObject(v)) {
+          v = JSON.stringify(v);
+        }
+        parts.push(encode(key) + '=' + encode(v));
+      });
+    });
+
+    serializedParams = parts.join('&');
+  }
+
+  if (serializedParams) {
+    var hashmarkIndex = url.indexOf('#');
+    if (hashmarkIndex !== -1) {
+      url = url.slice(0, hashmarkIndex);
+    }
+
+    url += (url.indexOf('?') === -1 ? '?' : '&') + serializedParams;
+  }
+
+  return url;
+};
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/InterceptorManager.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+function InterceptorManager() {
+  this.handlers = [];
+}
+
+/**
+ * Add a new interceptor to the stack
+ *
+ * @param {Function} fulfilled The function to handle `then` for a `Promise`
+ * @param {Function} rejected The function to handle `reject` for a `Promise`
+ *
+ * @return {Number} An ID used to remove interceptor later
+ */
+InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+  this.handlers.push({
+    fulfilled: fulfilled,
+    rejected: rejected
+  });
+  return this.handlers.length - 1;
+};
+
+/**
+ * Remove an interceptor from the stack
+ *
+ * @param {Number} id The ID that was returned by `use`
+ */
+InterceptorManager.prototype.eject = function eject(id) {
+  if (this.handlers[id]) {
+    this.handlers[id] = null;
+  }
+};
+
+/**
+ * Iterate over all the registered interceptors
+ *
+ * This method is particularly useful for skipping over any
+ * interceptors that may have become `null` calling `eject`.
+ *
+ * @param {Function} fn The function to call for each interceptor
+ */
+InterceptorManager.prototype.forEach = function forEach(fn) {
+  utils.forEach(this.handlers, function forEachHandler(h) {
+    if (h !== null) {
+      fn(h);
+    }
+  });
+};
+
+module.exports = InterceptorManager;
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/transformData.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Object|String} data The data to be transformed
+ * @param {Array} headers The headers for the request or response
+ * @param {Array|Function} fns A single function or Array of functions
+ * @returns {*} The resulting transformed data
+ */
+module.exports = function transformData(data, headers, fns) {
+  /*eslint no-param-reassign:0*/
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+
+  return data;
+};
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/cancel/isCancel.js":[function(require,module,exports) {
+'use strict';
+
+module.exports = function isCancel(value) {
+  return !!(value && value.__CANCEL__);
+};
+
+},{}],"../node_modules/axios/lib/helpers/normalizeHeaderName.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('../utils');
+
+module.exports = function normalizeHeaderName(headers, normalizedName) {
+  utils.forEach(headers, function processHeader(value, name) {
+    if (name !== normalizedName && name.toUpperCase() === normalizedName.toUpperCase()) {
+      headers[normalizedName] = value;
+      delete headers[name];
+    }
+  });
+};
+
+},{"../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/enhanceError.js":[function(require,module,exports) {
+'use strict';
+
+/**
+ * Update an Error with the specified config, error code, and response.
+ *
+ * @param {Error} error The error to update.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The error.
+ */
+module.exports = function enhanceError(error, config, code, request, response) {
+  error.config = config;
+  if (code) {
+    error.code = code;
+  }
+
+  error.request = request;
+  error.response = response;
+  error.isAxiosError = true;
+
+  error.toJSON = function toJSON() {
+    return {
+      // Standard
+      message: this.message,
+      name: this.name,
+      // Microsoft
+      description: this.description,
+      number: this.number,
+      // Mozilla
+      fileName: this.fileName,
+      lineNumber: this.lineNumber,
+      columnNumber: this.columnNumber,
+      stack: this.stack,
+      // Axios
+      config: this.config,
+      code: this.code
+    };
+  };
+  return error;
+};
+
+},{}],"../node_modules/axios/lib/core/createError.js":[function(require,module,exports) {
+'use strict';
+
+var enhanceError = require('./enhanceError');
+
+/**
+ * Create an Error with the specified message, config, error code, request and response.
+ *
+ * @param {string} message The error message.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The created error.
+ */
+module.exports = function createError(message, config, code, request, response) {
+  var error = new Error(message);
+  return enhanceError(error, config, code, request, response);
+};
+
+},{"./enhanceError":"../node_modules/axios/lib/core/enhanceError.js"}],"../node_modules/axios/lib/core/settle.js":[function(require,module,exports) {
+'use strict';
+
+var createError = require('./createError');
+
+/**
+ * Resolve or reject a Promise based on response status.
+ *
+ * @param {Function} resolve A function that resolves the promise.
+ * @param {Function} reject A function that rejects the promise.
+ * @param {object} response The response.
+ */
+module.exports = function settle(resolve, reject, response) {
+  var validateStatus = response.config.validateStatus;
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(createError(
+      'Request failed with status code ' + response.status,
+      response.config,
+      null,
+      response.request,
+      response
+    ));
+  }
+};
+
+},{"./createError":"../node_modules/axios/lib/core/createError.js"}],"../node_modules/axios/lib/helpers/cookies.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs support document.cookie
+    (function standardBrowserEnv() {
+      return {
+        write: function write(name, value, expires, path, domain, secure) {
+          var cookie = [];
+          cookie.push(name + '=' + encodeURIComponent(value));
+
+          if (utils.isNumber(expires)) {
+            cookie.push('expires=' + new Date(expires).toGMTString());
+          }
+
+          if (utils.isString(path)) {
+            cookie.push('path=' + path);
+          }
+
+          if (utils.isString(domain)) {
+            cookie.push('domain=' + domain);
+          }
+
+          if (secure === true) {
+            cookie.push('secure');
+          }
+
+          document.cookie = cookie.join('; ');
+        },
+
+        read: function read(name) {
+          var match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+          return (match ? decodeURIComponent(match[3]) : null);
+        },
+
+        remove: function remove(name) {
+          this.write(name, '', Date.now() - 86400000);
+        }
+      };
+    })() :
+
+  // Non standard browser env (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return {
+        write: function write() {},
+        read: function read() { return null; },
+        remove: function remove() {}
+      };
+    })()
+);
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/helpers/isAbsoluteURL.js":[function(require,module,exports) {
+'use strict';
+
+/**
+ * Determines whether the specified URL is absolute
+ *
+ * @param {string} url The URL to test
+ * @returns {boolean} True if the specified URL is absolute, otherwise false
+ */
+module.exports = function isAbsoluteURL(url) {
+  // A URL is considered absolute if it begins with "<scheme>://" or "//" (protocol-relative URL).
+  // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
+  // by any combination of letters, digits, plus, period, or hyphen.
+  return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+},{}],"../node_modules/axios/lib/helpers/combineURLs.js":[function(require,module,exports) {
+'use strict';
+
+/**
+ * Creates a new URL by combining the specified URLs
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} relativeURL The relative URL
+ * @returns {string} The combined URL
+ */
+module.exports = function combineURLs(baseURL, relativeURL) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+};
+
+},{}],"../node_modules/axios/lib/core/buildFullPath.js":[function(require,module,exports) {
+'use strict';
+
+var isAbsoluteURL = require('../helpers/isAbsoluteURL');
+var combineURLs = require('../helpers/combineURLs');
+
+/**
+ * Creates a new URL by combining the baseURL with the requestedURL,
+ * only when the requestedURL is not already an absolute URL.
+ * If the requestURL is absolute, this function returns the requestedURL untouched.
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} requestedURL Absolute or relative URL to combine
+ * @returns {string} The combined full path
+ */
+module.exports = function buildFullPath(baseURL, requestedURL) {
+  if (baseURL && !isAbsoluteURL(requestedURL)) {
+    return combineURLs(baseURL, requestedURL);
+  }
+  return requestedURL;
+};
+
+},{"../helpers/isAbsoluteURL":"../node_modules/axios/lib/helpers/isAbsoluteURL.js","../helpers/combineURLs":"../node_modules/axios/lib/helpers/combineURLs.js"}],"../node_modules/axios/lib/helpers/parseHeaders.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+// Headers whose duplicates are ignored by node
+// c.f. https://nodejs.org/api/http.html#http_message_headers
+var ignoreDuplicateOf = [
+  'age', 'authorization', 'content-length', 'content-type', 'etag',
+  'expires', 'from', 'host', 'if-modified-since', 'if-unmodified-since',
+  'last-modified', 'location', 'max-forwards', 'proxy-authorization',
+  'referer', 'retry-after', 'user-agent'
+];
+
+/**
+ * Parse headers into an object
+ *
+ * ```
+ * Date: Wed, 27 Aug 2014 08:58:49 GMT
+ * Content-Type: application/json
+ * Connection: keep-alive
+ * Transfer-Encoding: chunked
+ * ```
+ *
+ * @param {String} headers Headers needing to be parsed
+ * @returns {Object} Headers parsed into an object
+ */
+module.exports = function parseHeaders(headers) {
+  var parsed = {};
+  var key;
+  var val;
+  var i;
+
+  if (!headers) { return parsed; }
+
+  utils.forEach(headers.split('\n'), function parser(line) {
+    i = line.indexOf(':');
+    key = utils.trim(line.substr(0, i)).toLowerCase();
+    val = utils.trim(line.substr(i + 1));
+
+    if (key) {
+      if (parsed[key] && ignoreDuplicateOf.indexOf(key) >= 0) {
+        return;
+      }
+      if (key === 'set-cookie') {
+        parsed[key] = (parsed[key] ? parsed[key] : []).concat([val]);
+      } else {
+        parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+      }
+    }
+  });
+
+  return parsed;
+};
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/helpers/isURLSameOrigin.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs have full support of the APIs needed to test
+  // whether the request URL is of the same origin as current location.
+    (function standardBrowserEnv() {
+      var msie = /(msie|trident)/i.test(navigator.userAgent);
+      var urlParsingNode = document.createElement('a');
+      var originURL;
+
+      /**
+    * Parse a URL to discover it's components
+    *
+    * @param {String} url The URL to be parsed
+    * @returns {Object}
+    */
+      function resolveURL(url) {
+        var href = url;
+
+        if (msie) {
+        // IE needs attribute set twice to normalize properties
+          urlParsingNode.setAttribute('href', href);
+          href = urlParsingNode.href;
+        }
+
+        urlParsingNode.setAttribute('href', href);
+
+        // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
+        return {
+          href: urlParsingNode.href,
+          protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
+          host: urlParsingNode.host,
+          search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
+          hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
+          hostname: urlParsingNode.hostname,
+          port: urlParsingNode.port,
+          pathname: (urlParsingNode.pathname.charAt(0) === '/') ?
+            urlParsingNode.pathname :
+            '/' + urlParsingNode.pathname
+        };
+      }
+
+      originURL = resolveURL(window.location.href);
+
+      /**
+    * Determine if a URL shares the same origin as the current location
+    *
+    * @param {String} requestURL The URL to test
+    * @returns {boolean} True if URL shares the same origin, otherwise false
+    */
+      return function isURLSameOrigin(requestURL) {
+        var parsed = (utils.isString(requestURL)) ? resolveURL(requestURL) : requestURL;
+        return (parsed.protocol === originURL.protocol &&
+            parsed.host === originURL.host);
+      };
+    })() :
+
+  // Non standard browser envs (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return function isURLSameOrigin() {
+        return true;
+      };
+    })()
+);
+
+},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/adapters/xhr.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+var settle = require('./../core/settle');
+var cookies = require('./../helpers/cookies');
+var buildURL = require('./../helpers/buildURL');
+var buildFullPath = require('../core/buildFullPath');
+var parseHeaders = require('./../helpers/parseHeaders');
+var isURLSameOrigin = require('./../helpers/isURLSameOrigin');
+var createError = require('../core/createError');
+
+module.exports = function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    var requestData = config.data;
+    var requestHeaders = config.headers;
+
+    if (utils.isFormData(requestData)) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    if (
+      (utils.isBlob(requestData) || utils.isFile(requestData)) &&
+      requestData.type
+    ) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    var request = new XMLHttpRequest();
+
+    // HTTP basic authentication
+    if (config.auth) {
+      var username = config.auth.username || '';
+      var password = unescape(encodeURIComponent(config.auth.password)) || '';
+      requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    var fullPath = buildFullPath(config.baseURL, config.url);
+    request.open(config.method.toUpperCase(), buildURL(fullPath, config.params, config.paramsSerializer), true);
+
+    // Set the request timeout in MS
+    request.timeout = config.timeout;
+
+    // Listen for ready state
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
+        return;
+      }
+
+      // The request errored out and we didn't get a response, this will be
+      // handled by onerror instead
+      // With one exception: request that using file: protocol, most browsers
+      // will return status as 0 even though it's a successful request
+      if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+        return;
+      }
+
+      // Prepare the response
+      var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
+      var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
+      var response = {
+        data: responseData,
+        status: request.status,
+        statusText: request.statusText,
+        headers: responseHeaders,
+        config: config,
+        request: request
+      };
+
+      settle(resolve, reject, response);
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle browser request cancellation (as opposed to a manual cancellation)
+    request.onabort = function handleAbort() {
+      if (!request) {
+        return;
+      }
+
+      reject(createError('Request aborted', config, 'ECONNABORTED', request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle low level network errors
+    request.onerror = function handleError() {
+      // Real errors are hidden from us by the browser
+      // onerror should only fire if it's a network error
+      reject(createError('Network Error', config, null, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle timeout
+    request.ontimeout = function handleTimeout() {
+      var timeoutErrorMessage = 'timeout of ' + config.timeout + 'ms exceeded';
+      if (config.timeoutErrorMessage) {
+        timeoutErrorMessage = config.timeoutErrorMessage;
+      }
+      reject(createError(timeoutErrorMessage, config, 'ECONNABORTED',
+        request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (utils.isStandardBrowserEnv()) {
+      // Add xsrf header
+      var xsrfValue = (config.withCredentials || isURLSameOrigin(fullPath)) && config.xsrfCookieName ?
+        cookies.read(config.xsrfCookieName) :
+        undefined;
+
+      if (xsrfValue) {
+        requestHeaders[config.xsrfHeaderName] = xsrfValue;
+      }
+    }
+
+    // Add headers to the request
+    if ('setRequestHeader' in request) {
+      utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+        if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+          // Remove Content-Type if data is undefined
+          delete requestHeaders[key];
+        } else {
+          // Otherwise add header to the request
+          request.setRequestHeader(key, val);
+        }
+      });
+    }
+
+    // Add withCredentials to request if needed
+    if (!utils.isUndefined(config.withCredentials)) {
+      request.withCredentials = !!config.withCredentials;
+    }
+
+    // Add responseType to request if needed
+    if (config.responseType) {
+      try {
+        request.responseType = config.responseType;
+      } catch (e) {
+        // Expected DOMException thrown by browsers not compatible XMLHttpRequest Level 2.
+        // But, this can be suppressed for 'json' type as it can be parsed by default 'transformResponse' function.
+        if (config.responseType !== 'json') {
+          throw e;
+        }
+      }
+    }
+
+    // Handle progress if needed
+    if (typeof config.onDownloadProgress === 'function') {
+      request.addEventListener('progress', config.onDownloadProgress);
+    }
+
+    // Not all browsers support upload events
+    if (typeof config.onUploadProgress === 'function' && request.upload) {
+      request.upload.addEventListener('progress', config.onUploadProgress);
+    }
+
+    if (config.cancelToken) {
+      // Handle cancellation
+      config.cancelToken.promise.then(function onCanceled(cancel) {
+        if (!request) {
+          return;
+        }
+
+        request.abort();
+        reject(cancel);
+        // Clean up request
+        request = null;
+      });
+    }
+
+    if (!requestData) {
+      requestData = null;
+    }
+
+    // Send the request
+    request.send(requestData);
+  });
+};
+
+},{"./../utils":"../node_modules/axios/lib/utils.js","./../core/settle":"../node_modules/axios/lib/core/settle.js","./../helpers/cookies":"../node_modules/axios/lib/helpers/cookies.js","./../helpers/buildURL":"../node_modules/axios/lib/helpers/buildURL.js","../core/buildFullPath":"../node_modules/axios/lib/core/buildFullPath.js","./../helpers/parseHeaders":"../node_modules/axios/lib/helpers/parseHeaders.js","./../helpers/isURLSameOrigin":"../node_modules/axios/lib/helpers/isURLSameOrigin.js","../core/createError":"../node_modules/axios/lib/core/createError.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
+
+// shim for using process in browser
+var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+  throw new Error('setTimeout has not been defined');
+}
+
+function defaultClearTimeout() {
+  throw new Error('clearTimeout has not been defined');
+}
+
+(function () {
+  try {
+    if (typeof setTimeout === 'function') {
+      cachedSetTimeout = setTimeout;
+    } else {
+      cachedSetTimeout = defaultSetTimout;
+    }
+  } catch (e) {
+    cachedSetTimeout = defaultSetTimout;
+  }
+
+  try {
+    if (typeof clearTimeout === 'function') {
+      cachedClearTimeout = clearTimeout;
+    } else {
+      cachedClearTimeout = defaultClearTimeout;
+    }
+  } catch (e) {
+    cachedClearTimeout = defaultClearTimeout;
+  }
+})();
+
+function runTimeout(fun) {
+  if (cachedSetTimeout === setTimeout) {
+    //normal enviroments in sane situations
+    return setTimeout(fun, 0);
+  } // if setTimeout wasn't available but was latter defined
+
+
+  if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+    cachedSetTimeout = setTimeout;
+    return setTimeout(fun, 0);
+  }
+
+  try {
+    // when when somebody has screwed with setTimeout but no I.E. maddness
+    return cachedSetTimeout(fun, 0);
+  } catch (e) {
+    try {
+      // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+      return cachedSetTimeout.call(null, fun, 0);
+    } catch (e) {
+      // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+      return cachedSetTimeout.call(this, fun, 0);
+    }
+  }
+}
+
+function runClearTimeout(marker) {
+  if (cachedClearTimeout === clearTimeout) {
+    //normal enviroments in sane situations
+    return clearTimeout(marker);
+  } // if clearTimeout wasn't available but was latter defined
+
+
+  if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+    cachedClearTimeout = clearTimeout;
+    return clearTimeout(marker);
+  }
+
+  try {
+    // when when somebody has screwed with setTimeout but no I.E. maddness
+    return cachedClearTimeout(marker);
+  } catch (e) {
+    try {
+      // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+      return cachedClearTimeout.call(null, marker);
+    } catch (e) {
+      // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+      // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+      return cachedClearTimeout.call(this, marker);
+    }
+  }
+}
+
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+  if (!draining || !currentQueue) {
+    return;
+  }
+
+  draining = false;
+
+  if (currentQueue.length) {
+    queue = currentQueue.concat(queue);
+  } else {
+    queueIndex = -1;
+  }
+
+  if (queue.length) {
+    drainQueue();
+  }
+}
+
+function drainQueue() {
+  if (draining) {
+    return;
+  }
+
+  var timeout = runTimeout(cleanUpNextTick);
+  draining = true;
+  var len = queue.length;
+
+  while (len) {
+    currentQueue = queue;
+    queue = [];
+
+    while (++queueIndex < len) {
+      if (currentQueue) {
+        currentQueue[queueIndex].run();
+      }
+    }
+
+    queueIndex = -1;
+    len = queue.length;
+  }
+
+  currentQueue = null;
+  draining = false;
+  runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+  var args = new Array(arguments.length - 1);
+
+  if (arguments.length > 1) {
+    for (var i = 1; i < arguments.length; i++) {
+      args[i - 1] = arguments[i];
+    }
+  }
+
+  queue.push(new Item(fun, args));
+
+  if (queue.length === 1 && !draining) {
+    runTimeout(drainQueue);
+  }
+}; // v8 likes predictible objects
+
+
+function Item(fun, array) {
+  this.fun = fun;
+  this.array = array;
+}
+
+Item.prototype.run = function () {
+  this.fun.apply(null, this.array);
+};
+
+process.title = 'browser';
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) {
+  return [];
+};
+
+process.binding = function (name) {
+  throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () {
+  return '/';
+};
+
+process.chdir = function (dir) {
+  throw new Error('process.chdir is not supported');
+};
+
+process.umask = function () {
+  return 0;
+};
+},{}],"../node_modules/axios/lib/defaults.js":[function(require,module,exports) {
+var process = require("process");
+'use strict';
+
+var utils = require('./utils');
+var normalizeHeaderName = require('./helpers/normalizeHeaderName');
+
+var DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
+};
+
+function setContentTypeIfUnset(headers, value) {
+  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
+    headers['Content-Type'] = value;
+  }
+}
+
+function getDefaultAdapter() {
+  var adapter;
+  if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = require('./adapters/xhr');
+  } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
+    // For node use HTTP adapter
+    adapter = require('./adapters/http');
+  }
+  return adapter;
+}
+
+var defaults = {
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Accept');
+    normalizeHeaderName(headers, 'Content-Type');
+    if (utils.isFormData(data) ||
+      utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
+    }
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    /*eslint no-param-reassign:0*/
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+  maxBodyLength: -1,
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  }
+};
+
+defaults.headers = {
+  common: {
+    'Accept': 'application/json, text/plain, */*'
+  }
+};
+
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+module.exports = defaults;
+
+},{"./utils":"../node_modules/axios/lib/utils.js","./helpers/normalizeHeaderName":"../node_modules/axios/lib/helpers/normalizeHeaderName.js","./adapters/xhr":"../node_modules/axios/lib/adapters/xhr.js","./adapters/http":"../node_modules/axios/lib/adapters/xhr.js","process":"../node_modules/process/browser.js"}],"../node_modules/axios/lib/core/dispatchRequest.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+var transformData = require('./transformData');
+var isCancel = require('../cancel/isCancel');
+var defaults = require('../defaults');
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+function throwIfCancellationRequested(config) {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested();
+  }
+}
+
+/**
+ * Dispatch a request to the server using the configured adapter.
+ *
+ * @param {object} config The config that is to be used for the request
+ * @returns {Promise} The Promise to be fulfilled
+ */
+module.exports = function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  // Ensure headers exist
+  config.headers = config.headers || {};
+
+  // Transform request data
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  // Flatten headers
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers
+  );
+
+  utils.forEach(
+    ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+    function cleanHeaderConfig(method) {
+      delete config.headers[method];
+    }
+  );
+
+  var adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+};
+
+},{"./../utils":"../node_modules/axios/lib/utils.js","./transformData":"../node_modules/axios/lib/core/transformData.js","../cancel/isCancel":"../node_modules/axios/lib/cancel/isCancel.js","../defaults":"../node_modules/axios/lib/defaults.js"}],"../node_modules/axios/lib/core/mergeConfig.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('../utils');
+
+/**
+ * Config-specific merge-function which creates a new config-object
+ * by merging two configuration objects together.
+ *
+ * @param {Object} config1
+ * @param {Object} config2
+ * @returns {Object} New object resulting from merging config2 to config1
+ */
+module.exports = function mergeConfig(config1, config2) {
+  // eslint-disable-next-line no-param-reassign
+  config2 = config2 || {};
+  var config = {};
+
+  var valueFromConfig2Keys = ['url', 'method', 'data'];
+  var mergeDeepPropertiesKeys = ['headers', 'auth', 'proxy', 'params'];
+  var defaultToConfig2Keys = [
+    'baseURL', 'transformRequest', 'transformResponse', 'paramsSerializer',
+    'timeout', 'timeoutMessage', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
+    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress', 'decompress',
+    'maxContentLength', 'maxBodyLength', 'maxRedirects', 'transport', 'httpAgent',
+    'httpsAgent', 'cancelToken', 'socketPath', 'responseEncoding'
+  ];
+  var directMergeKeys = ['validateStatus'];
+
+  function getMergedValue(target, source) {
+    if (utils.isPlainObject(target) && utils.isPlainObject(source)) {
+      return utils.merge(target, source);
+    } else if (utils.isPlainObject(source)) {
+      return utils.merge({}, source);
+    } else if (utils.isArray(source)) {
+      return source.slice();
+    }
+    return source;
+  }
+
+  function mergeDeepProperties(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  }
+
+  utils.forEach(valueFromConfig2Keys, function valueFromConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
+    }
+  });
+
+  utils.forEach(mergeDeepPropertiesKeys, mergeDeepProperties);
+
+  utils.forEach(defaultToConfig2Keys, function defaultToConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  });
+
+  utils.forEach(directMergeKeys, function merge(prop) {
+    if (prop in config2) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (prop in config1) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  });
+
+  var axiosKeys = valueFromConfig2Keys
+    .concat(mergeDeepPropertiesKeys)
+    .concat(defaultToConfig2Keys)
+    .concat(directMergeKeys);
+
+  var otherKeys = Object
+    .keys(config1)
+    .concat(Object.keys(config2))
+    .filter(function filterAxiosKeys(key) {
+      return axiosKeys.indexOf(key) === -1;
+    });
+
+  utils.forEach(otherKeys, mergeDeepProperties);
+
+  return config;
+};
+
+},{"../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/Axios.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./../utils');
+var buildURL = require('../helpers/buildURL');
+var InterceptorManager = require('./InterceptorManager');
+var dispatchRequest = require('./dispatchRequest');
+var mergeConfig = require('./mergeConfig');
+
+/**
+ * Create a new instance of Axios
+ *
+ * @param {Object} instanceConfig The default config for the instance
+ */
+function Axios(instanceConfig) {
+  this.defaults = instanceConfig;
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+/**
+ * Dispatch a request
+ *
+ * @param {Object} config The config specific for this request (merged with this.defaults)
+ */
+Axios.prototype.request = function request(config) {
+  /*eslint no-param-reassign:0*/
+  // Allow for axios('example/url'[, config]) a la fetch API
+  if (typeof config === 'string') {
+    config = arguments[1] || {};
+    config.url = arguments[0];
+  } else {
+    config = config || {};
+  }
+
+  config = mergeConfig(this.defaults, config);
+
+  // Set config.method
+  if (config.method) {
+    config.method = config.method.toLowerCase();
+  } else if (this.defaults.method) {
+    config.method = this.defaults.method.toLowerCase();
+  } else {
+    config.method = 'get';
+  }
+
+  // Hook up interceptors middleware
+  var chain = [dispatchRequest, undefined];
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+Axios.prototype.getUri = function getUri(config) {
+  config = mergeConfig(this.defaults, config);
+  return buildURL(config.url, config.params, config.paramsSerializer).replace(/^\?/, '');
+};
+
+// Provide aliases for supported request methods
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, config) {
+    return this.request(mergeConfig(config || {}, {
+      method: method,
+      url: url
+    }));
+  };
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, data, config) {
+    return this.request(mergeConfig(config || {}, {
+      method: method,
+      url: url,
+      data: data
+    }));
+  };
+});
+
+module.exports = Axios;
+
+},{"./../utils":"../node_modules/axios/lib/utils.js","../helpers/buildURL":"../node_modules/axios/lib/helpers/buildURL.js","./InterceptorManager":"../node_modules/axios/lib/core/InterceptorManager.js","./dispatchRequest":"../node_modules/axios/lib/core/dispatchRequest.js","./mergeConfig":"../node_modules/axios/lib/core/mergeConfig.js"}],"../node_modules/axios/lib/cancel/Cancel.js":[function(require,module,exports) {
+'use strict';
+
+/**
+ * A `Cancel` is an object that is thrown when an operation is canceled.
+ *
+ * @class
+ * @param {string=} message The message.
+ */
+function Cancel(message) {
+  this.message = message;
+}
+
+Cancel.prototype.toString = function toString() {
+  return 'Cancel' + (this.message ? ': ' + this.message : '');
+};
+
+Cancel.prototype.__CANCEL__ = true;
+
+module.exports = Cancel;
+
+},{}],"../node_modules/axios/lib/cancel/CancelToken.js":[function(require,module,exports) {
+'use strict';
+
+var Cancel = require('./Cancel');
+
+/**
+ * A `CancelToken` is an object that can be used to request cancellation of an operation.
+ *
+ * @class
+ * @param {Function} executor The executor function.
+ */
+function CancelToken(executor) {
+  if (typeof executor !== 'function') {
+    throw new TypeError('executor must be a function.');
+  }
+
+  var resolvePromise;
+  this.promise = new Promise(function promiseExecutor(resolve) {
+    resolvePromise = resolve;
+  });
+
+  var token = this;
+  executor(function cancel(message) {
+    if (token.reason) {
+      // Cancellation has already been requested
+      return;
+    }
+
+    token.reason = new Cancel(message);
+    resolvePromise(token.reason);
+  });
+}
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+CancelToken.prototype.throwIfRequested = function throwIfRequested() {
+  if (this.reason) {
+    throw this.reason;
+  }
+};
+
+/**
+ * Returns an object that contains a new `CancelToken` and a function that, when called,
+ * cancels the `CancelToken`.
+ */
+CancelToken.source = function source() {
+  var cancel;
+  var token = new CancelToken(function executor(c) {
+    cancel = c;
+  });
+  return {
+    token: token,
+    cancel: cancel
+  };
+};
+
+module.exports = CancelToken;
+
+},{"./Cancel":"../node_modules/axios/lib/cancel/Cancel.js"}],"../node_modules/axios/lib/helpers/spread.js":[function(require,module,exports) {
+'use strict';
+
+/**
+ * Syntactic sugar for invoking a function and expanding an array for arguments.
+ *
+ * Common use case would be to use `Function.prototype.apply`.
+ *
+ *  ```js
+ *  function f(x, y, z) {}
+ *  var args = [1, 2, 3];
+ *  f.apply(null, args);
+ *  ```
+ *
+ * With `spread` this example can be re-written.
+ *
+ *  ```js
+ *  spread(function(x, y, z) {})([1, 2, 3]);
+ *  ```
+ *
+ * @param {Function} callback
+ * @returns {Function}
+ */
+module.exports = function spread(callback) {
+  return function wrap(arr) {
+    return callback.apply(null, arr);
+  };
+};
+
+},{}],"../node_modules/axios/lib/axios.js":[function(require,module,exports) {
+'use strict';
+
+var utils = require('./utils');
+var bind = require('./helpers/bind');
+var Axios = require('./core/Axios');
+var mergeConfig = require('./core/mergeConfig');
+var defaults = require('./defaults');
+
+/**
+ * Create an instance of Axios
+ *
+ * @param {Object} defaultConfig The default config for the instance
+ * @return {Axios} A new instance of Axios
+ */
+function createInstance(defaultConfig) {
+  var context = new Axios(defaultConfig);
+  var instance = bind(Axios.prototype.request, context);
+
+  // Copy axios.prototype to instance
+  utils.extend(instance, Axios.prototype, context);
+
+  // Copy context to instance
+  utils.extend(instance, context);
+
+  return instance;
+}
+
+// Create the default instance to be exported
+var axios = createInstance(defaults);
+
+// Expose Axios class to allow class inheritance
+axios.Axios = Axios;
+
+// Factory for creating new instances
+axios.create = function create(instanceConfig) {
+  return createInstance(mergeConfig(axios.defaults, instanceConfig));
+};
+
+// Expose Cancel & CancelToken
+axios.Cancel = require('./cancel/Cancel');
+axios.CancelToken = require('./cancel/CancelToken');
+axios.isCancel = require('./cancel/isCancel');
+
+// Expose all/spread
+axios.all = function all(promises) {
+  return Promise.all(promises);
+};
+axios.spread = require('./helpers/spread');
+
+module.exports = axios;
+
+// Allow use of default import syntax in TypeScript
+module.exports.default = axios;
+
+},{"./utils":"../node_modules/axios/lib/utils.js","./helpers/bind":"../node_modules/axios/lib/helpers/bind.js","./core/Axios":"../node_modules/axios/lib/core/Axios.js","./core/mergeConfig":"../node_modules/axios/lib/core/mergeConfig.js","./defaults":"../node_modules/axios/lib/defaults.js","./cancel/Cancel":"../node_modules/axios/lib/cancel/Cancel.js","./cancel/CancelToken":"../node_modules/axios/lib/cancel/CancelToken.js","./cancel/isCancel":"../node_modules/axios/lib/cancel/isCancel.js","./helpers/spread":"../node_modules/axios/lib/helpers/spread.js"}],"../node_modules/axios/index.js":[function(require,module,exports) {
+module.exports = require('./lib/axios');
+},{"./lib/axios":"../node_modules/axios/lib/axios.js"}],"../node_modules/base64-js/index.js":[function(require,module,exports) {
 'use strict'
 
 exports.byteLength = byteLength
@@ -37930,6 +40664,10 @@ var _Textarea = _interopRequireDefault(require("./Textarea"));
 
 var _Button = _interopRequireDefault(require("./Button"));
 
+var _big = _interopRequireDefault(require("big.js"));
+
+var _axios = _interopRequireDefault(require("axios"));
+
 var photoActions = _interopRequireWildcard(require("../redux/actions/photos"));
 
 require("./UploadPhoto.scss");
@@ -37946,6 +40684,8 @@ const MAX_IMAGE_SIZE = 30000; // 30KB
 
 const MAX_IMAGE_SIZE_MB = 0.03; // 30KB
 
+const BOATLOAD_OF_GAS = (0, _big.default)(3).times(10 ** 13).toFixed();
+
 class UploadPhoto extends _react.Component {
   constructor(...args) {
     super(...args);
@@ -37953,10 +40693,10 @@ class UploadPhoto extends _react.Component {
     _defineProperty(this, "state", {
       file: '',
       fileName: '',
-      location: '',
-      caption: '',
+      title: '',
       warningMessage: '',
-      isCompressing: false
+      isCompressing: false,
+      isLoading: false
     });
 
     _defineProperty(this, "handleInputChange", e => {
@@ -37981,17 +40721,43 @@ class UploadPhoto extends _react.Component {
       });
     });
 
-    _defineProperty(this, "handleSubmit", e => {
+    _defineProperty(this, "handleSubmit", async e => {
       e.preventDefault();
       const {
         file,
         fileName,
-        location,
-        caption
+        title
       } = this.state;
-      this.props.uploadPhoto(file, fileName, location, caption);
+      const {
+        contract,
+        currentUser
+      } = this.props;
+      this.setState({
+        isLoading: true
+      });
+      const formData = new FormData();
+      formData.append('file', file);
+      (0, _axios.default)({
+        method: 'post',
+        baseURL: 'https://ipfs.infura.io:5001',
+        url: '/api/v0/add',
+        data: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(async response => {
+        const photoURI = response.data.Hash;
+        const result = await contract.writeTodo({
+          title: title,
+          photo: photoURI
+        }, BOATLOAD_OF_GAS);
+        console.log(result);
+        this.setState({
+          isLoading: false
+        });
 
-      _ui.default.hideModal();
+        _ui.default.hideModal();
+      });
     });
 
     _defineProperty(this, "compressImage", async imageFile => {
@@ -38039,23 +40805,23 @@ class UploadPhoto extends _react.Component {
       onChange: this.handleInputChange,
       placeholder: "Your todo",
       required: true
-    }), /*#__PURE__*/_react.default.createElement(_Button.default, {
+    }), this.state.isLoading ? /*#__PURE__*/_react.default.createElement(Loading, null) : /*#__PURE__*/_react.default.createElement(_Button.default, {
       className: "UploadPhoto__upload",
       type: "submit",
-      title: "Upload"
+      title: "Create Todo"
     }));
   }
 
 }
 
-const mapDispatchToProps = dispatch => ({
-  uploadPhoto: (file, fileName, title) => dispatch(photoActions.uploadPhoto(file, fileName, title))
+const mapDispatchToProps = dispatch => ({// uploadPhoto: (file, fileName, title) =>
+  //   dispatch(photoActions.uploadPhoto(file, fileName, title)),
 });
 
 var _default = (0, _reactRedux.connect)(null, mapDispatchToProps)(UploadPhoto);
 
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/imageCompression":"utils/imageCompression.js","../utils/ui":"utils/ui.js","./Input":"components/Input.js","./Textarea":"components/Textarea.js","./Button":"components/Button.js","../redux/actions/photos":"redux/actions/photos.js","./UploadPhoto.scss":"components/UploadPhoto.scss"}],"components/UploadButton.scss":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/imageCompression":"utils/imageCompression.js","../utils/ui":"utils/ui.js","./Input":"components/Input.js","./Textarea":"components/Textarea.js","./Button":"components/Button.js","big.js":"../node_modules/big.js/big.js","axios":"../node_modules/axios/index.js","../redux/actions/photos":"redux/actions/photos.js","./UploadPhoto.scss":"components/UploadPhoto.scss"}],"components/UploadButton.scss":[function(require,module,exports) {
 var reloadCSS = require('_css_loader');
 
 module.hot.dispose(reloadCSS);
@@ -38078,11 +40844,17 @@ require("./UploadButton.scss");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const UploadButton = () => /*#__PURE__*/_react.default.createElement("button", {
+const UploadButton = ({
+  contract,
+  currentUser
+}) => /*#__PURE__*/_react.default.createElement("button", {
   className: "UploadButton",
   onClick: () => _ui.default.showModal({
     header: 'Upload Photo',
-    content: /*#__PURE__*/_react.default.createElement(_UploadPhoto.default, null)
+    content: /*#__PURE__*/_react.default.createElement(_UploadPhoto.default, {
+      contract: contract,
+      currentUser: currentUser
+    })
   })
 }, "New");
 
@@ -43815,293 +46587,17 @@ function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj;
 const PhotoInfo = ({
   name,
   caption,
-  issueDate
+  isVerified,
+  verifier
 }) => /*#__PURE__*/_react.default.createElement(_react.Fragment, null, /*#__PURE__*/_react.default.createElement("h2", {
   className: "PhotoInfo__name"
 }, name), /*#__PURE__*/_react.default.createElement("p", {
   className: "PhotoInfo__caption"
-}, caption), /*#__PURE__*/_react.default.createElement("span", {
-  className: "PhotoInfo__issueDate"
-}, issueDate));
+}, caption));
 
 var _default = PhotoInfo;
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","./PhotoInfo.scss":"components/PhotoInfo.scss"}],"components/IconButton.scss":[function(require,module,exports) {
-var reloadCSS = require('_css_loader');
-
-module.hot.dispose(reloadCSS);
-module.hot.accept(reloadCSS);
-},{"_css_loader":"../node_modules/parcel-bundler/src/builtins/css-loader.js"}],"components/IconButton.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _react = _interopRequireDefault(require("react"));
-
-var _classnames = _interopRequireDefault(require("classnames"));
-
-require("./IconButton.scss");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const IconButton = ({
-  className,
-  icon,
-  alt,
-  onClick
-}) => /*#__PURE__*/_react.default.createElement("button", {
-  className: (0, _classnames.default)('IconButton', className),
-  onClick: onClick
-}, /*#__PURE__*/_react.default.createElement("img", {
-  src: `images/${icon}`,
-  alt: alt
-}));
-
-var _default = IconButton;
-exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./IconButton.scss":"components/IconButton.scss"}],"components/CopyrightInfo.scss":[function(require,module,exports) {
-var reloadCSS = require('_css_loader');
-
-module.hot.dispose(reloadCSS);
-module.hot.accept(reloadCSS);
-},{"_css_loader":"../node_modules/parcel-bundler/src/builtins/css-loader.js"}],"components/CopyrightInfo.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _react = _interopRequireWildcard(require("react"));
-
-var _classnames = _interopRequireDefault(require("classnames"));
-
-var _IconButton = _interopRequireDefault(require("./IconButton"));
-
-require("./CopyrightInfo.scss");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-class CopyrightInfo extends _react.Component {
-  constructor(...args) {
-    super(...args);
-
-    _defineProperty(this, "state", {
-      showInfo: false
-    });
-
-    _defineProperty(this, "toggleShowInfo", () => this.setState({
-      showInfo: !this.state.showInfo
-    }));
-  }
-
-  render() {
-    const {
-      showInfo
-    } = this.state;
-    const {
-      className,
-      id,
-      issueDate,
-      originalOwner,
-      currentOwner
-    } = this.props;
-    return /*#__PURE__*/_react.default.createElement("div", {
-      className: (0, _classnames.default)('CopyrightInfo', className)
-    }, /*#__PURE__*/_react.default.createElement(_IconButton.default, {
-      className: "CopyrightInfo__button",
-      icon: "icon-copyright.png",
-      alt: "Show copyright info",
-      onClick: this.toggleShowInfo
-    }), showInfo && /*#__PURE__*/_react.default.createElement(InfoTooltip, {
-      id: id,
-      issueDate: issueDate,
-      originalOwner: originalOwner,
-      currentOwner: currentOwner
-    }));
-  }
-
-}
-
-const InfoTooltip = ({
-  id,
-  issueDate,
-  originalOwner,
-  currentOwner
-}) => /*#__PURE__*/_react.default.createElement("div", {
-  className: "CopyrightInfo__info"
-}, /*#__PURE__*/_react.default.createElement("header", {
-  className: "CopyrightInfo__header"
-}, /*#__PURE__*/_react.default.createElement("h5", {
-  className: "CopyrightInfo__id"
-}, "Copyright.", id), /*#__PURE__*/_react.default.createElement("span", {
-  className: "CopyrightInfo__registerDate"
-}, issueDate)), /*#__PURE__*/_react.default.createElement("p", {
-  className: "CopyrightInfo__owner"
-}, "Original Owner"), /*#__PURE__*/_react.default.createElement("p", {
-  className: "CopyrightInfo__owner"
-}, "Current Owner"));
-
-var _default = CopyrightInfo;
-exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","./IconButton":"components/IconButton.js","./CopyrightInfo.scss":"components/CopyrightInfo.scss"}],"components/TransferOwnership.scss":[function(require,module,exports) {
-var reloadCSS = require('_css_loader');
-
-module.hot.dispose(reloadCSS);
-module.hot.accept(reloadCSS);
-},{"_css_loader":"../node_modules/parcel-bundler/src/builtins/css-loader.js"}],"components/TransferOwnership.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _react = _interopRequireWildcard(require("react"));
-
-var _reactRedux = require("react-redux");
-
-var _ui = _interopRequireDefault(require("../utils/ui"));
-
-var _Input = _interopRequireDefault(require("./Input"));
-
-var _Button = _interopRequireDefault(require("./Button"));
-
-require("./TransferOwnership.scss");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-class TransferOwnership extends _react.Component {
-  constructor(...args) {
-    super(...args);
-
-    _defineProperty(this, "state", {
-      to: null,
-      warningMessage: ''
-    });
-
-    _defineProperty(this, "handleInputChange", e => {
-      this.setState({
-        [e.target.name]: e.target.value
-      });
-    });
-
-    _defineProperty(this, "handleSubmit", e => {
-      e.preventDefault();
-      const {
-        id,
-        transferOwnership
-      } = this.props;
-      const {
-        to
-      } = this.state;
-      transferOwnership(id, to);
-
-      _ui.default.hideModal();
-    });
-  }
-
-  render() {
-    const {
-      id,
-      issueDate,
-      currentOwner
-    } = this.props;
-    return /*#__PURE__*/_react.default.createElement("div", {
-      className: "TransferOwnership"
-    }, /*#__PURE__*/_react.default.createElement("h3", {
-      className: "TransferOwnership__copyright"
-    }, "Copyright. ", id), /*#__PURE__*/_react.default.createElement("p", {
-      className: "TransferOwnership__issueDate"
-    }, "Issue Date  ", issueDate), /*#__PURE__*/_react.default.createElement("form", {
-      className: "TransferOwnership__form",
-      onSubmit: this.handleSubmit
-    }, /*#__PURE__*/_react.default.createElement(_Input.default, {
-      className: "TransferOwnership__from",
-      name: "from",
-      label: "Current Owner",
-      value: currentOwner,
-      readOnly: true
-    }), /*#__PURE__*/_react.default.createElement(_Input.default, {
-      className: "TransferOwnership__to",
-      name: "to",
-      label: "New Owner",
-      onChange: this.handleInputChange,
-      placeholder: "Transfer Ownership to...",
-      err: this.state.warningMessage,
-      required: true
-    }), /*#__PURE__*/_react.default.createElement(_Button.default, {
-      type: "submit",
-      title: "Transfer Ownership"
-    })));
-  }
-
-}
-
-const mapDispatchToProps = dispatch => ({
-  transferOwnership: (id, to) => dispatch(photoActions.transferOwnership(id, to))
-});
-
-var _default = (0, _reactRedux.connect)(null, mapDispatchToProps)(TransferOwnership);
-
-exports.default = _default;
-},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/ui":"utils/ui.js","./Input":"components/Input.js","./Button":"components/Button.js","./TransferOwnership.scss":"components/TransferOwnership.scss"}],"components/TransferOwnershipButton.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _react = _interopRequireDefault(require("react"));
-
-var _classnames = _interopRequireDefault(require("classnames"));
-
-var _ui = _interopRequireDefault(require("../utils/ui"));
-
-var _IconButton = _interopRequireDefault(require("./IconButton"));
-
-var _TransferOwnership = _interopRequireDefault(require("./TransferOwnership"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-const TransferOwnershipButton = ({
-  id,
-  issueDate,
-  currentOwner,
-  className
-}) => /*#__PURE__*/_react.default.createElement(_IconButton.default, {
-  className: (0, _classnames.default)('TransferOwnershipButton', className),
-  icon: "icon-transfer.png",
-  alt: "Transfer Ownership",
-  onClick: () => _ui.default.showModal({
-    header: 'Transfer Ownership',
-    content: /*#__PURE__*/_react.default.createElement(_TransferOwnership.default, {
-      id: id,
-      issueDate: issueDate,
-      currentOwner: currentOwner
-    })
-  })
-});
-
-var _default = TransferOwnershipButton;
-exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","../utils/ui":"utils/ui.js","./IconButton":"components/IconButton.js","./TransferOwnership":"components/TransferOwnership.js"}],"components/Feed.scss":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","./PhotoInfo.scss":"components/PhotoInfo.scss"}],"components/Feed.scss":[function(require,module,exports) {
 var reloadCSS = require('_css_loader');
 
 module.hot.dispose(reloadCSS);
@@ -44124,13 +46620,11 @@ var _Loading = _interopRequireDefault(require("./Loading"));
 
 var _PhotoInfo = _interopRequireDefault(require("./PhotoInfo"));
 
-var _CopyrightInfo = _interopRequireDefault(require("./CopyrightInfo"));
+var _Button = _interopRequireDefault(require("./Button"));
 
-var _TransferOwnershipButton = _interopRequireDefault(require("./TransferOwnershipButton"));
+var _ui = _interopRequireDefault(require("../utils/ui"));
 
-var _imageUtils = require("../utils/imageUtils");
-
-var photoActions = _interopRequireWildcard(require("../redux/actions/photos"));
+var _big = _interopRequireDefault(require("big.js"));
 
 require("./Feed.scss");
 
@@ -44142,73 +46636,94 @@ function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj;
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+const BOATLOAD_OF_GAS = (0, _big.default)(3).times(10 ** 13).toFixed();
+
 class Feed extends _react.Component {
   constructor(props) {
     super(props);
     this.state = {
-      isLoading: !props.feed
+      isLoading: false,
+      feeds: []
     };
   }
 
   componentDidMount() {
     const {
-      feed,
-      getFeed
+      contract,
+      currentUser
     } = this.props;
-    if (!feed) getFeed();
+    this.setState({
+      isLoading: true
+    });
+    contract.getTodoList().then(feeds => {
+      console.log(feeds);
+      this.setState({
+        isLoading: false,
+        feeds
+      });
+    });
+  }
+
+  async verify(todoId) {
+    const {
+      contract
+    } = this.props;
+    this.setState({
+      isLoading: true
+    });
+    const result = await contract.verifyTodo({
+      todoId: todoId
+    }, BOATLOAD_OF_GAS);
+    console.log(result);
+    contract.getTodoList().then(feeds => {
+      console.log(feeds);
+      this.setState({
+        isLoading: false,
+        feeds
+      });
+    });
   }
 
   render() {
     const {
-      feed
-    } = this.props;
+      feeds
+    } = this.state;
     if (this.state.isLoading) return /*#__PURE__*/_react.default.createElement(_Loading.default, null);
     return /*#__PURE__*/_react.default.createElement("div", {
       className: "Feed"
-    }, feed.length !== 0 ? feed.map(({
-      id,
-      ownerHistory,
-      data,
-      name,
-      caption,
-      timestamp
+    }, feeds.length !== 0 ? feeds.map(({
+      todoId,
+      owner,
+      title,
+      photo,
+      timestamp,
+      isVerified,
+      verifier
     }) => {
-      const originalOwner = ownerHistory[0];
-      const imageUrl = (0, _imageUtils.drawImageFromBytes)(data);
-      const issueDate = (0, _moment.default)(timestamp * 1000).fromNow();
+      const photoUri = `https://gateway.ipfs.io/ipfs/${photo}`;
       return /*#__PURE__*/_react.default.createElement("div", {
         className: "FeedPhoto",
-        key: id
+        key: todoId
       }, /*#__PURE__*/_react.default.createElement("div", {
         className: "FeedPhoto__image"
       }, /*#__PURE__*/_react.default.createElement("img", {
-        src: imageUrl,
-        alt: name
+        src: photoUri,
+        alt: title
       })), /*#__PURE__*/_react.default.createElement("div", {
         className: "FeedPhoto__info"
       }, /*#__PURE__*/_react.default.createElement(_PhotoInfo.default, {
-        name: name,
-        issueDate: issueDate,
-        caption: caption
-      }), /*#__PURE__*/_react.default.createElement(_CopyrightInfo.default, {
-        className: "FeedPhoto__copyrightInfo",
-        id: id,
-        issueDate: issueDate,
-        originalOwner: originalOwner,
-        currentOwner: currentOwner
-      }),
-      /*#__PURE__*/
-      // userAddress === currentOwner && (
-      _react.default.createElement(_TransferOwnershipButton.default, {
-        className: "FeedPhoto__transferOwnership",
-        id: id,
-        issueDate: issueDate,
-        currentOwner: currentOwner
-      }) // )
-      ));
+        name: owner,
+        caption: title,
+        isVerified: isVerified,
+        verifier: verifier
+      }), isVerified ? /*#__PURE__*/_react.default.createElement("div", null, /*#__PURE__*/_react.default.createElement("h3", null, "Verified from ", verifier)) : /*#__PURE__*/_react.default.createElement(_Button.default, {
+        alt: "Verify",
+        title: "verify",
+        onClick: this.verify.bind(this, todoId)
+      })));
     }) : /*#__PURE__*/_react.default.createElement("span", {
       className: "Feed__empty"
-    }, "No Photo"));
+    }, "No List"));
   }
 
 }
@@ -44225,18 +46740,16 @@ _defineProperty(Feed, "getDerivedStateFromProps", (nextProps, prevState) => {
   return null;
 });
 
-const mapStateToProps = state => ({
-  feed: state.photos.feed
+const mapStateToProps = state => ({// feed: state.photos.feed  
 });
 
-const mapDispatchToProps = dispatch => ({
-  getFeed: () => dispatch(photoActions.getFeed())
+const mapDispatchToProps = dispatch => ({// getFeed: () => dispatch(photoActions.getFeed()),
 });
 
 var _default = (0, _reactRedux.connect)(mapStateToProps, mapDispatchToProps)(Feed);
 
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","moment":"../node_modules/moment/moment.js","./Loading":"components/Loading.js","./PhotoInfo":"components/PhotoInfo.js","./CopyrightInfo":"components/CopyrightInfo.js","./TransferOwnershipButton":"components/TransferOwnershipButton.js","../utils/imageUtils":"utils/imageUtils.js","../redux/actions/photos":"redux/actions/photos.js","./Feed.scss":"components/Feed.scss"}],"pages/Feeds.scss":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","moment":"../node_modules/moment/moment.js","./Loading":"components/Loading.js","./PhotoInfo":"components/PhotoInfo.js","./Button":"components/Button.js","../utils/ui":"utils/ui.js","big.js":"../node_modules/big.js/big.js","./Feed.scss":"components/Feed.scss"}],"pages/Feeds.scss":[function(require,module,exports) {
 var reloadCSS = require('_css_loader');
 
 module.hot.dispose(reloadCSS);
@@ -44259,9 +46772,22 @@ require("./Feeds.scss");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const Feeds = () => /*#__PURE__*/_react.default.createElement("main", {
+const Feeds = ({
+  contract,
+  currentUser,
+  nearConfig,
+  wallet
+}) => /*#__PURE__*/_react.default.createElement("main", {
   className: "Feeds"
-}, /*#__PURE__*/_react.default.createElement(_Feed.default, null), /*#__PURE__*/_react.default.createElement(_UploadButton.default, null));
+}, /*#__PURE__*/_react.default.createElement(_Feed.default, {
+  contract: contract,
+  currentUser: currentUser,
+  nearConfig: nearConfig,
+  wallet: wallet
+}), /*#__PURE__*/_react.default.createElement(_UploadButton.default, {
+  contract: contract,
+  currentUser: currentUser
+}));
 
 var _default = Feeds;
 exports.default = _default;
@@ -44334,7 +46860,7 @@ var _reactRedux = require("react-redux");
 
 var _ui = _interopRequireDefault(require("../utils/ui"));
 
-var _IconButton = _interopRequireDefault(require("./IconButton"));
+var _Button = _interopRequireDefault(require("./Button"));
 
 require("./Toast.scss");
 
@@ -44363,10 +46889,10 @@ class Toast extends _react.Component {
       className: "Toast__message"
     }, toast.message), toast.txHash && /*#__PURE__*/_react.default.createElement("div", {
       className: "Toast__txHash"
-    }, toast.txHash), /*#__PURE__*/_react.default.createElement(_IconButton.default, {
+    }, toast.txHash), /*#__PURE__*/_react.default.createElement(_Button.default, {
       className: "Toast__close",
-      icon: "icon-close.png",
       alt: "close toast",
+      title: "close",
       onClick: _ui.default.hideToast
     }));
   }
@@ -44380,951 +46906,7 @@ const mapStateToProps = state => ({
 var _default = (0, _reactRedux.connect)(mapStateToProps)(Toast);
 
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/ui":"utils/ui.js","./IconButton":"components/IconButton.js","./Toast.scss":"components/Toast.scss"}],"../node_modules/big.js/big.js":[function(require,module,exports) {
-var define;
-/*
- *  big.js v5.2.2
- *  A small, fast, easy-to-use library for arbitrary-precision decimal arithmetic.
- *  Copyright (c) 2018 Michael Mclaughlin <M8ch88l@gmail.com>
- *  https://github.com/MikeMcl/big.js/LICENCE
- */
-;(function (GLOBAL) {
-  'use strict';
-  var Big,
-
-
-/************************************** EDITABLE DEFAULTS *****************************************/
-
-
-    // The default values below must be integers within the stated ranges.
-
-    /*
-     * The maximum number of decimal places (DP) of the results of operations involving division:
-     * div and sqrt, and pow with negative exponents.
-     */
-    DP = 20,          // 0 to MAX_DP
-
-    /*
-     * The rounding mode (RM) used when rounding to the above decimal places.
-     *
-     *  0  Towards zero (i.e. truncate, no rounding).       (ROUND_DOWN)
-     *  1  To nearest neighbour. If equidistant, round up.  (ROUND_HALF_UP)
-     *  2  To nearest neighbour. If equidistant, to even.   (ROUND_HALF_EVEN)
-     *  3  Away from zero.                                  (ROUND_UP)
-     */
-    RM = 1,             // 0, 1, 2 or 3
-
-    // The maximum value of DP and Big.DP.
-    MAX_DP = 1E6,       // 0 to 1000000
-
-    // The maximum magnitude of the exponent argument to the pow method.
-    MAX_POWER = 1E6,    // 1 to 1000000
-
-    /*
-     * The negative exponent (NE) at and beneath which toString returns exponential notation.
-     * (JavaScript numbers: -7)
-     * -1000000 is the minimum recommended exponent value of a Big.
-     */
-    NE = -7,            // 0 to -1000000
-
-    /*
-     * The positive exponent (PE) at and above which toString returns exponential notation.
-     * (JavaScript numbers: 21)
-     * 1000000 is the maximum recommended exponent value of a Big.
-     * (This limit is not enforced or checked.)
-     */
-    PE = 21,            // 0 to 1000000
-
-
-/**************************************************************************************************/
-
-
-    // Error messages.
-    NAME = '[big.js] ',
-    INVALID = NAME + 'Invalid ',
-    INVALID_DP = INVALID + 'decimal places',
-    INVALID_RM = INVALID + 'rounding mode',
-    DIV_BY_ZERO = NAME + 'Division by zero',
-
-    // The shared prototype object.
-    P = {},
-    UNDEFINED = void 0,
-    NUMERIC = /^-?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i;
-
-
-  /*
-   * Create and return a Big constructor.
-   *
-   */
-  function _Big_() {
-
-    /*
-     * The Big constructor and exported function.
-     * Create and return a new instance of a Big number object.
-     *
-     * n {number|string|Big} A numeric value.
-     */
-    function Big(n) {
-      var x = this;
-
-      // Enable constructor usage without new.
-      if (!(x instanceof Big)) return n === UNDEFINED ? _Big_() : new Big(n);
-
-      // Duplicate.
-      if (n instanceof Big) {
-        x.s = n.s;
-        x.e = n.e;
-        x.c = n.c.slice();
-      } else {
-        parse(x, n);
-      }
-
-      /*
-       * Retain a reference to this Big constructor, and shadow Big.prototype.constructor which
-       * points to Object.
-       */
-      x.constructor = Big;
-    }
-
-    Big.prototype = P;
-    Big.DP = DP;
-    Big.RM = RM;
-    Big.NE = NE;
-    Big.PE = PE;
-    Big.version = '5.2.2';
-
-    return Big;
-  }
-
-
-  /*
-   * Parse the number or string value passed to a Big constructor.
-   *
-   * x {Big} A Big number instance.
-   * n {number|string} A numeric value.
-   */
-  function parse(x, n) {
-    var e, i, nl;
-
-    // Minus zero?
-    if (n === 0 && 1 / n < 0) n = '-0';
-    else if (!NUMERIC.test(n += '')) throw Error(INVALID + 'number');
-
-    // Determine sign.
-    x.s = n.charAt(0) == '-' ? (n = n.slice(1), -1) : 1;
-
-    // Decimal point?
-    if ((e = n.indexOf('.')) > -1) n = n.replace('.', '');
-
-    // Exponential form?
-    if ((i = n.search(/e/i)) > 0) {
-
-      // Determine exponent.
-      if (e < 0) e = i;
-      e += +n.slice(i + 1);
-      n = n.substring(0, i);
-    } else if (e < 0) {
-
-      // Integer.
-      e = n.length;
-    }
-
-    nl = n.length;
-
-    // Determine leading zeros.
-    for (i = 0; i < nl && n.charAt(i) == '0';) ++i;
-
-    if (i == nl) {
-
-      // Zero.
-      x.c = [x.e = 0];
-    } else {
-
-      // Determine trailing zeros.
-      for (; nl > 0 && n.charAt(--nl) == '0';);
-      x.e = e - i - 1;
-      x.c = [];
-
-      // Convert string to array of digits without leading/trailing zeros.
-      for (e = 0; i <= nl;) x.c[e++] = +n.charAt(i++);
-    }
-
-    return x;
-  }
-
-
-  /*
-   * Round Big x to a maximum of dp decimal places using rounding mode rm.
-   * Called by stringify, P.div, P.round and P.sqrt.
-   *
-   * x {Big} The Big to round.
-   * dp {number} Integer, 0 to MAX_DP inclusive.
-   * rm {number} 0, 1, 2 or 3 (DOWN, HALF_UP, HALF_EVEN, UP)
-   * [more] {boolean} Whether the result of division was truncated.
-   */
-  function round(x, dp, rm, more) {
-    var xc = x.c,
-      i = x.e + dp + 1;
-
-    if (i < xc.length) {
-      if (rm === 1) {
-
-        // xc[i] is the digit after the digit that may be rounded up.
-        more = xc[i] >= 5;
-      } else if (rm === 2) {
-        more = xc[i] > 5 || xc[i] == 5 &&
-          (more || i < 0 || xc[i + 1] !== UNDEFINED || xc[i - 1] & 1);
-      } else if (rm === 3) {
-        more = more || !!xc[0];
-      } else {
-        more = false;
-        if (rm !== 0) throw Error(INVALID_RM);
-      }
-
-      if (i < 1) {
-        xc.length = 1;
-
-        if (more) {
-
-          // 1, 0.1, 0.01, 0.001, 0.0001 etc.
-          x.e = -dp;
-          xc[0] = 1;
-        } else {
-
-          // Zero.
-          xc[0] = x.e = 0;
-        }
-      } else {
-
-        // Remove any digits after the required decimal places.
-        xc.length = i--;
-
-        // Round up?
-        if (more) {
-
-          // Rounding up may mean the previous digit has to be rounded up.
-          for (; ++xc[i] > 9;) {
-            xc[i] = 0;
-            if (!i--) {
-              ++x.e;
-              xc.unshift(1);
-            }
-          }
-        }
-
-        // Remove trailing zeros.
-        for (i = xc.length; !xc[--i];) xc.pop();
-      }
-    } else if (rm < 0 || rm > 3 || rm !== ~~rm) {
-      throw Error(INVALID_RM);
-    }
-
-    return x;
-  }
-
-
-  /*
-   * Return a string representing the value of Big x in normal or exponential notation.
-   * Handles P.toExponential, P.toFixed, P.toJSON, P.toPrecision, P.toString and P.valueOf.
-   *
-   * x {Big}
-   * id? {number} Caller id.
-   *         1 toExponential
-   *         2 toFixed
-   *         3 toPrecision
-   *         4 valueOf
-   * n? {number|undefined} Caller's argument.
-   * k? {number|undefined}
-   */
-  function stringify(x, id, n, k) {
-    var e, s,
-      Big = x.constructor,
-      z = !x.c[0];
-
-    if (n !== UNDEFINED) {
-      if (n !== ~~n || n < (id == 3) || n > MAX_DP) {
-        throw Error(id == 3 ? INVALID + 'precision' : INVALID_DP);
-      }
-
-      x = new Big(x);
-
-      // The index of the digit that may be rounded up.
-      n = k - x.e;
-
-      // Round?
-      if (x.c.length > ++k) round(x, n, Big.RM);
-
-      // toFixed: recalculate k as x.e may have changed if value rounded up.
-      if (id == 2) k = x.e + n + 1;
-
-      // Append zeros?
-      for (; x.c.length < k;) x.c.push(0);
-    }
-
-    e = x.e;
-    s = x.c.join('');
-    n = s.length;
-
-    // Exponential notation?
-    if (id != 2 && (id == 1 || id == 3 && k <= e || e <= Big.NE || e >= Big.PE)) {
-      s = s.charAt(0) + (n > 1 ? '.' + s.slice(1) : '') + (e < 0 ? 'e' : 'e+') + e;
-
-    // Normal notation.
-    } else if (e < 0) {
-      for (; ++e;) s = '0' + s;
-      s = '0.' + s;
-    } else if (e > 0) {
-      if (++e > n) for (e -= n; e--;) s += '0';
-      else if (e < n) s = s.slice(0, e) + '.' + s.slice(e);
-    } else if (n > 1) {
-      s = s.charAt(0) + '.' + s.slice(1);
-    }
-
-    return x.s < 0 && (!z || id == 4) ? '-' + s : s;
-  }
-
-
-  // Prototype/instance methods
-
-
-  /*
-   * Return a new Big whose value is the absolute value of this Big.
-   */
-  P.abs = function () {
-    var x = new this.constructor(this);
-    x.s = 1;
-    return x;
-  };
-
-
-  /*
-   * Return 1 if the value of this Big is greater than the value of Big y,
-   *       -1 if the value of this Big is less than the value of Big y, or
-   *        0 if they have the same value.
-  */
-  P.cmp = function (y) {
-    var isneg,
-      x = this,
-      xc = x.c,
-      yc = (y = new x.constructor(y)).c,
-      i = x.s,
-      j = y.s,
-      k = x.e,
-      l = y.e;
-
-    // Either zero?
-    if (!xc[0] || !yc[0]) return !xc[0] ? !yc[0] ? 0 : -j : i;
-
-    // Signs differ?
-    if (i != j) return i;
-
-    isneg = i < 0;
-
-    // Compare exponents.
-    if (k != l) return k > l ^ isneg ? 1 : -1;
-
-    j = (k = xc.length) < (l = yc.length) ? k : l;
-
-    // Compare digit by digit.
-    for (i = -1; ++i < j;) {
-      if (xc[i] != yc[i]) return xc[i] > yc[i] ^ isneg ? 1 : -1;
-    }
-
-    // Compare lengths.
-    return k == l ? 0 : k > l ^ isneg ? 1 : -1;
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big divided by the value of Big y, rounded,
-   * if necessary, to a maximum of Big.DP decimal places using rounding mode Big.RM.
-   */
-  P.div = function (y) {
-    var x = this,
-      Big = x.constructor,
-      a = x.c,                  // dividend
-      b = (y = new Big(y)).c,   // divisor
-      k = x.s == y.s ? 1 : -1,
-      dp = Big.DP;
-
-    if (dp !== ~~dp || dp < 0 || dp > MAX_DP) throw Error(INVALID_DP);
-
-    // Divisor is zero?
-    if (!b[0]) throw Error(DIV_BY_ZERO);
-
-    // Dividend is 0? Return +-0.
-    if (!a[0]) return new Big(k * 0);
-
-    var bl, bt, n, cmp, ri,
-      bz = b.slice(),
-      ai = bl = b.length,
-      al = a.length,
-      r = a.slice(0, bl),   // remainder
-      rl = r.length,
-      q = y,                // quotient
-      qc = q.c = [],
-      qi = 0,
-      d = dp + (q.e = x.e - y.e) + 1;    // number of digits of the result
-
-    q.s = k;
-    k = d < 0 ? 0 : d;
-
-    // Create version of divisor with leading zero.
-    bz.unshift(0);
-
-    // Add zeros to make remainder as long as divisor.
-    for (; rl++ < bl;) r.push(0);
-
-    do {
-
-      // n is how many times the divisor goes into current remainder.
-      for (n = 0; n < 10; n++) {
-
-        // Compare divisor and remainder.
-        if (bl != (rl = r.length)) {
-          cmp = bl > rl ? 1 : -1;
-        } else {
-          for (ri = -1, cmp = 0; ++ri < bl;) {
-            if (b[ri] != r[ri]) {
-              cmp = b[ri] > r[ri] ? 1 : -1;
-              break;
-            }
-          }
-        }
-
-        // If divisor < remainder, subtract divisor from remainder.
-        if (cmp < 0) {
-
-          // Remainder can't be more than 1 digit longer than divisor.
-          // Equalise lengths using divisor with extra leading zero?
-          for (bt = rl == bl ? b : bz; rl;) {
-            if (r[--rl] < bt[rl]) {
-              ri = rl;
-              for (; ri && !r[--ri];) r[ri] = 9;
-              --r[ri];
-              r[rl] += 10;
-            }
-            r[rl] -= bt[rl];
-          }
-
-          for (; !r[0];) r.shift();
-        } else {
-          break;
-        }
-      }
-
-      // Add the digit n to the result array.
-      qc[qi++] = cmp ? n : ++n;
-
-      // Update the remainder.
-      if (r[0] && cmp) r[rl] = a[ai] || 0;
-      else r = [a[ai]];
-
-    } while ((ai++ < al || r[0] !== UNDEFINED) && k--);
-
-    // Leading zero? Do not remove if result is simply zero (qi == 1).
-    if (!qc[0] && qi != 1) {
-
-      // There can't be more than one zero.
-      qc.shift();
-      q.e--;
-    }
-
-    // Round?
-    if (qi > d) round(q, dp, Big.RM, r[0] !== UNDEFINED);
-
-    return q;
-  };
-
-
-  /*
-   * Return true if the value of this Big is equal to the value of Big y, otherwise return false.
-   */
-  P.eq = function (y) {
-    return !this.cmp(y);
-  };
-
-
-  /*
-   * Return true if the value of this Big is greater than the value of Big y, otherwise return
-   * false.
-   */
-  P.gt = function (y) {
-    return this.cmp(y) > 0;
-  };
-
-
-  /*
-   * Return true if the value of this Big is greater than or equal to the value of Big y, otherwise
-   * return false.
-   */
-  P.gte = function (y) {
-    return this.cmp(y) > -1;
-  };
-
-
-  /*
-   * Return true if the value of this Big is less than the value of Big y, otherwise return false.
-   */
-  P.lt = function (y) {
-    return this.cmp(y) < 0;
-  };
-
-
-  /*
-   * Return true if the value of this Big is less than or equal to the value of Big y, otherwise
-   * return false.
-   */
-  P.lte = function (y) {
-    return this.cmp(y) < 1;
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big minus the value of Big y.
-   */
-  P.minus = P.sub = function (y) {
-    var i, j, t, xlty,
-      x = this,
-      Big = x.constructor,
-      a = x.s,
-      b = (y = new Big(y)).s;
-
-    // Signs differ?
-    if (a != b) {
-      y.s = -b;
-      return x.plus(y);
-    }
-
-    var xc = x.c.slice(),
-      xe = x.e,
-      yc = y.c,
-      ye = y.e;
-
-    // Either zero?
-    if (!xc[0] || !yc[0]) {
-
-      // y is non-zero? x is non-zero? Or both are zero.
-      return yc[0] ? (y.s = -b, y) : new Big(xc[0] ? x : 0);
-    }
-
-    // Determine which is the bigger number. Prepend zeros to equalise exponents.
-    if (a = xe - ye) {
-
-      if (xlty = a < 0) {
-        a = -a;
-        t = xc;
-      } else {
-        ye = xe;
-        t = yc;
-      }
-
-      t.reverse();
-      for (b = a; b--;) t.push(0);
-      t.reverse();
-    } else {
-
-      // Exponents equal. Check digit by digit.
-      j = ((xlty = xc.length < yc.length) ? xc : yc).length;
-
-      for (a = b = 0; b < j; b++) {
-        if (xc[b] != yc[b]) {
-          xlty = xc[b] < yc[b];
-          break;
-        }
-      }
-    }
-
-    // x < y? Point xc to the array of the bigger number.
-    if (xlty) {
-      t = xc;
-      xc = yc;
-      yc = t;
-      y.s = -y.s;
-    }
-
-    /*
-     * Append zeros to xc if shorter. No need to add zeros to yc if shorter as subtraction only
-     * needs to start at yc.length.
-     */
-    if ((b = (j = yc.length) - (i = xc.length)) > 0) for (; b--;) xc[i++] = 0;
-
-    // Subtract yc from xc.
-    for (b = i; j > a;) {
-      if (xc[--j] < yc[j]) {
-        for (i = j; i && !xc[--i];) xc[i] = 9;
-        --xc[i];
-        xc[j] += 10;
-      }
-
-      xc[j] -= yc[j];
-    }
-
-    // Remove trailing zeros.
-    for (; xc[--b] === 0;) xc.pop();
-
-    // Remove leading zeros and adjust exponent accordingly.
-    for (; xc[0] === 0;) {
-      xc.shift();
-      --ye;
-    }
-
-    if (!xc[0]) {
-
-      // n - n = +0
-      y.s = 1;
-
-      // Result must be zero.
-      xc = [ye = 0];
-    }
-
-    y.c = xc;
-    y.e = ye;
-
-    return y;
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big modulo the value of Big y.
-   */
-  P.mod = function (y) {
-    var ygtx,
-      x = this,
-      Big = x.constructor,
-      a = x.s,
-      b = (y = new Big(y)).s;
-
-    if (!y.c[0]) throw Error(DIV_BY_ZERO);
-
-    x.s = y.s = 1;
-    ygtx = y.cmp(x) == 1;
-    x.s = a;
-    y.s = b;
-
-    if (ygtx) return new Big(x);
-
-    a = Big.DP;
-    b = Big.RM;
-    Big.DP = Big.RM = 0;
-    x = x.div(y);
-    Big.DP = a;
-    Big.RM = b;
-
-    return this.minus(x.times(y));
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big plus the value of Big y.
-   */
-  P.plus = P.add = function (y) {
-    var t,
-      x = this,
-      Big = x.constructor,
-      a = x.s,
-      b = (y = new Big(y)).s;
-
-    // Signs differ?
-    if (a != b) {
-      y.s = -b;
-      return x.minus(y);
-    }
-
-    var xe = x.e,
-      xc = x.c,
-      ye = y.e,
-      yc = y.c;
-
-    // Either zero? y is non-zero? x is non-zero? Or both are zero.
-    if (!xc[0] || !yc[0]) return yc[0] ? y : new Big(xc[0] ? x : a * 0);
-
-    xc = xc.slice();
-
-    // Prepend zeros to equalise exponents.
-    // Note: reverse faster than unshifts.
-    if (a = xe - ye) {
-      if (a > 0) {
-        ye = xe;
-        t = yc;
-      } else {
-        a = -a;
-        t = xc;
-      }
-
-      t.reverse();
-      for (; a--;) t.push(0);
-      t.reverse();
-    }
-
-    // Point xc to the longer array.
-    if (xc.length - yc.length < 0) {
-      t = yc;
-      yc = xc;
-      xc = t;
-    }
-
-    a = yc.length;
-
-    // Only start adding at yc.length - 1 as the further digits of xc can be left as they are.
-    for (b = 0; a; xc[a] %= 10) b = (xc[--a] = xc[a] + yc[a] + b) / 10 | 0;
-
-    // No need to check for zero, as +x + +y != 0 && -x + -y != 0
-
-    if (b) {
-      xc.unshift(b);
-      ++ye;
-    }
-
-    // Remove trailing zeros.
-    for (a = xc.length; xc[--a] === 0;) xc.pop();
-
-    y.c = xc;
-    y.e = ye;
-
-    return y;
-  };
-
-
-  /*
-   * Return a Big whose value is the value of this Big raised to the power n.
-   * If n is negative, round to a maximum of Big.DP decimal places using rounding
-   * mode Big.RM.
-   *
-   * n {number} Integer, -MAX_POWER to MAX_POWER inclusive.
-   */
-  P.pow = function (n) {
-    var x = this,
-      one = new x.constructor(1),
-      y = one,
-      isneg = n < 0;
-
-    if (n !== ~~n || n < -MAX_POWER || n > MAX_POWER) throw Error(INVALID + 'exponent');
-    if (isneg) n = -n;
-
-    for (;;) {
-      if (n & 1) y = y.times(x);
-      n >>= 1;
-      if (!n) break;
-      x = x.times(x);
-    }
-
-    return isneg ? one.div(y) : y;
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big rounded using rounding mode rm
-   * to a maximum of dp decimal places, or, if dp is negative, to an integer which is a
-   * multiple of 10**-dp.
-   * If dp is not specified, round to 0 decimal places.
-   * If rm is not specified, use Big.RM.
-   *
-   * dp? {number} Integer, -MAX_DP to MAX_DP inclusive.
-   * rm? 0, 1, 2 or 3 (ROUND_DOWN, ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_UP)
-   */
-  P.round = function (dp, rm) {
-    var Big = this.constructor;
-    if (dp === UNDEFINED) dp = 0;
-    else if (dp !== ~~dp || dp < -MAX_DP || dp > MAX_DP) throw Error(INVALID_DP);
-    return round(new Big(this), dp, rm === UNDEFINED ? Big.RM : rm);
-  };
-
-
-  /*
-   * Return a new Big whose value is the square root of the value of this Big, rounded, if
-   * necessary, to a maximum of Big.DP decimal places using rounding mode Big.RM.
-   */
-  P.sqrt = function () {
-    var r, c, t,
-      x = this,
-      Big = x.constructor,
-      s = x.s,
-      e = x.e,
-      half = new Big(0.5);
-
-    // Zero?
-    if (!x.c[0]) return new Big(x);
-
-    // Negative?
-    if (s < 0) throw Error(NAME + 'No square root');
-
-    // Estimate.
-    s = Math.sqrt(x + '');
-
-    // Math.sqrt underflow/overflow?
-    // Re-estimate: pass x coefficient to Math.sqrt as integer, then adjust the result exponent.
-    if (s === 0 || s === 1 / 0) {
-      c = x.c.join('');
-      if (!(c.length + e & 1)) c += '0';
-      s = Math.sqrt(c);
-      e = ((e + 1) / 2 | 0) - (e < 0 || e & 1);
-      r = new Big((s == 1 / 0 ? '1e' : (s = s.toExponential()).slice(0, s.indexOf('e') + 1)) + e);
-    } else {
-      r = new Big(s);
-    }
-
-    e = r.e + (Big.DP += 4);
-
-    // Newton-Raphson iteration.
-    do {
-      t = r;
-      r = half.times(t.plus(x.div(t)));
-    } while (t.c.slice(0, e).join('') !== r.c.slice(0, e).join(''));
-
-    return round(r, Big.DP -= 4, Big.RM);
-  };
-
-
-  /*
-   * Return a new Big whose value is the value of this Big times the value of Big y.
-   */
-  P.times = P.mul = function (y) {
-    var c,
-      x = this,
-      Big = x.constructor,
-      xc = x.c,
-      yc = (y = new Big(y)).c,
-      a = xc.length,
-      b = yc.length,
-      i = x.e,
-      j = y.e;
-
-    // Determine sign of result.
-    y.s = x.s == y.s ? 1 : -1;
-
-    // Return signed 0 if either 0.
-    if (!xc[0] || !yc[0]) return new Big(y.s * 0);
-
-    // Initialise exponent of result as x.e + y.e.
-    y.e = i + j;
-
-    // If array xc has fewer digits than yc, swap xc and yc, and lengths.
-    if (a < b) {
-      c = xc;
-      xc = yc;
-      yc = c;
-      j = a;
-      a = b;
-      b = j;
-    }
-
-    // Initialise coefficient array of result with zeros.
-    for (c = new Array(j = a + b); j--;) c[j] = 0;
-
-    // Multiply.
-
-    // i is initially xc.length.
-    for (i = b; i--;) {
-      b = 0;
-
-      // a is yc.length.
-      for (j = a + i; j > i;) {
-
-        // Current sum of products at this digit position, plus carry.
-        b = c[j] + yc[i] * xc[j - i - 1] + b;
-        c[j--] = b % 10;
-
-        // carry
-        b = b / 10 | 0;
-      }
-
-      c[j] = (c[j] + b) % 10;
-    }
-
-    // Increment result exponent if there is a final carry, otherwise remove leading zero.
-    if (b) ++y.e;
-    else c.shift();
-
-    // Remove trailing zeros.
-    for (i = c.length; !c[--i];) c.pop();
-    y.c = c;
-
-    return y;
-  };
-
-
-  /*
-   * Return a string representing the value of this Big in exponential notation to dp fixed decimal
-   * places and rounded using Big.RM.
-   *
-   * dp? {number} Integer, 0 to MAX_DP inclusive.
-   */
-  P.toExponential = function (dp) {
-    return stringify(this, 1, dp, dp);
-  };
-
-
-  /*
-   * Return a string representing the value of this Big in normal notation to dp fixed decimal
-   * places and rounded using Big.RM.
-   *
-   * dp? {number} Integer, 0 to MAX_DP inclusive.
-   *
-   * (-0).toFixed(0) is '0', but (-0.1).toFixed(0) is '-0'.
-   * (-0).toFixed(1) is '0.0', but (-0.01).toFixed(1) is '-0.0'.
-   */
-  P.toFixed = function (dp) {
-    return stringify(this, 2, dp, this.e + dp);
-  };
-
-
-  /*
-   * Return a string representing the value of this Big rounded to sd significant digits using
-   * Big.RM. Use exponential notation if sd is less than the number of digits necessary to represent
-   * the integer part of the value in normal notation.
-   *
-   * sd {number} Integer, 1 to MAX_DP inclusive.
-   */
-  P.toPrecision = function (sd) {
-    return stringify(this, 3, sd, sd - 1);
-  };
-
-
-  /*
-   * Return a string representing the value of this Big.
-   * Return exponential notation if this Big has a positive exponent equal to or greater than
-   * Big.PE, or a negative exponent equal to or less than Big.NE.
-   * Omit the sign for negative zero.
-   */
-  P.toString = function () {
-    return stringify(this);
-  };
-
-
-  /*
-   * Return a string representing the value of this Big.
-   * Return exponential notation if this Big has a positive exponent equal to or greater than
-   * Big.PE, or a negative exponent equal to or less than Big.NE.
-   * Include the sign for negative zero.
-   */
-  P.valueOf = P.toJSON = function () {
-    return stringify(this, 4);
-  };
-
-
-  // Export
-
-
-  Big = _Big_();
-
-  Big['default'] = Big.Big = Big;
-
-  //AMD.
-  if (typeof define === 'function' && define.amd) {
-    define(function () { return Big; });
-
-  // Node and other CommonJS-like environments that support module.exports.
-  } else if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Big;
-
-  //Browser.
-  } else {
-    GLOBAL.Big = Big;
-  }
-})(this);
-
-},{}],"App.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","classnames":"../node_modules/classnames/index.js","react-redux":"../node_modules/react-redux/es/index.js","../utils/ui":"utils/ui.js","./Button":"components/Button.js","./Toast.scss":"components/Toast.scss"}],"App.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -45363,7 +46945,6 @@ const App = ({
 }) => {
   const [messages, setMessages] = (0, _react.useState)([]);
   (0, _react.useEffect)(() => {
-    // TODO: don't just fetch once; subscribe!
     contract.getMessages().then(setMessages);
   }, []);
   const onSubmit = (0, _react.useCallback)(e => {
@@ -45373,10 +46954,7 @@ const App = ({
       message,
       donation
     } = e.target.elements;
-    fieldset.disabled = true; // TODO: optimistically update page with new message,
-    // update blockchain data in background
-    // add uuid to each message, so we know which one is already known
-
+    fieldset.disabled = true;
     contract.addMessage({
       text: message.value
     }, BOATLOAD_OF_GAS, (0, _big.default)(donation.value || '0').times(10 ** 24).toFixed()).then(() => {
@@ -45439,7 +47017,12 @@ const App = ({
   _react.default.createElement("p", {
     key: i,
     className: message.premium ? 'is-premium' : ''
-  }, /*#__PURE__*/_react.default.createElement("strong", null, message.sender), ":", /*#__PURE__*/_react.default.createElement("br", null), message.text)), /*#__PURE__*/_react.default.createElement(_Feeds.default, null)));
+  }, /*#__PURE__*/_react.default.createElement("strong", null, message.sender), ":", /*#__PURE__*/_react.default.createElement("br", null), message.text)), /*#__PURE__*/_react.default.createElement(_Feeds.default, {
+    contract: contract,
+    currentUser: currentUser,
+    nearConfig: nearConfig,
+    wallet: wallet
+  })));
 };
 
 App.propTypes = {
@@ -53151,79 +54734,7 @@ function adaptTransactionResult(txResult) {
 }
 exports.adaptTransactionResult = adaptTransactionResult;
 
-},{"buffer":"../node_modules/buffer/index.js"}],"../node_modules/near-api-js/node_modules/depd/lib/browser/index.js":[function(require,module,exports) {
-/*!
- * depd
- * Copyright(c) 2015 Douglas Christopher Wilson
- * MIT Licensed
- */
-'use strict';
-/**
- * Module exports.
- * @public
- */
-
-module.exports = depd;
-/**
- * Create deprecate for namespace in caller.
- */
-
-function depd(namespace) {
-  if (!namespace) {
-    throw new TypeError('argument namespace is required');
-  }
-
-  function deprecate(message) {// no-op in browser
-  }
-
-  deprecate._file = undefined;
-  deprecate._ignored = true;
-  deprecate._namespace = namespace;
-  deprecate._traced = false;
-  deprecate._warned = Object.create(null);
-  deprecate.function = wrapfunction;
-  deprecate.property = wrapproperty;
-  return deprecate;
-}
-/**
- * Return a wrapped function in a deprecation message.
- *
- * This is a no-op version of the wrapper, which does nothing but call
- * validation.
- */
-
-
-function wrapfunction(fn, message) {
-  if (typeof fn !== 'function') {
-    throw new TypeError('argument fn must be a function');
-  }
-
-  return fn;
-}
-/**
- * Wrap property in a deprecation message.
- *
- * This is a no-op version of the wrapper, which does nothing but call
- * validation.
- */
-
-
-function wrapproperty(obj, prop, message) {
-  if (!obj || typeof obj !== 'object' && typeof obj !== 'function') {
-    throw new TypeError('argument obj must be object');
-  }
-
-  var descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-
-  if (!descriptor) {
-    throw new TypeError('must call property on owner object');
-  }
-
-  if (!descriptor.configurable) {
-    throw new TypeError('property must be configurable');
-  }
-}
-},{}],"../node_modules/depd/lib/browser/index.js":[function(require,module,exports) {
+},{"buffer":"../node_modules/buffer/index.js"}],"../node_modules/depd/lib/browser/index.js":[function(require,module,exports) {
 /*!
  * depd
  * Copyright(c) 2015 Douglas Christopher Wilson
@@ -53954,215 +55465,6 @@ function isFunction (value) {
 
 xhr = null // Help gc
 
-},{}],"../node_modules/process/browser.js":[function(require,module,exports) {
-
-// shim for using process in browser
-var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-  throw new Error('setTimeout has not been defined');
-}
-
-function defaultClearTimeout() {
-  throw new Error('clearTimeout has not been defined');
-}
-
-(function () {
-  try {
-    if (typeof setTimeout === 'function') {
-      cachedSetTimeout = setTimeout;
-    } else {
-      cachedSetTimeout = defaultSetTimout;
-    }
-  } catch (e) {
-    cachedSetTimeout = defaultSetTimout;
-  }
-
-  try {
-    if (typeof clearTimeout === 'function') {
-      cachedClearTimeout = clearTimeout;
-    } else {
-      cachedClearTimeout = defaultClearTimeout;
-    }
-  } catch (e) {
-    cachedClearTimeout = defaultClearTimeout;
-  }
-})();
-
-function runTimeout(fun) {
-  if (cachedSetTimeout === setTimeout) {
-    //normal enviroments in sane situations
-    return setTimeout(fun, 0);
-  } // if setTimeout wasn't available but was latter defined
-
-
-  if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-    cachedSetTimeout = setTimeout;
-    return setTimeout(fun, 0);
-  }
-
-  try {
-    // when when somebody has screwed with setTimeout but no I.E. maddness
-    return cachedSetTimeout(fun, 0);
-  } catch (e) {
-    try {
-      // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-      return cachedSetTimeout.call(null, fun, 0);
-    } catch (e) {
-      // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-      return cachedSetTimeout.call(this, fun, 0);
-    }
-  }
-}
-
-function runClearTimeout(marker) {
-  if (cachedClearTimeout === clearTimeout) {
-    //normal enviroments in sane situations
-    return clearTimeout(marker);
-  } // if clearTimeout wasn't available but was latter defined
-
-
-  if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-    cachedClearTimeout = clearTimeout;
-    return clearTimeout(marker);
-  }
-
-  try {
-    // when when somebody has screwed with setTimeout but no I.E. maddness
-    return cachedClearTimeout(marker);
-  } catch (e) {
-    try {
-      // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-      return cachedClearTimeout.call(null, marker);
-    } catch (e) {
-      // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-      // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-      return cachedClearTimeout.call(this, marker);
-    }
-  }
-}
-
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-  if (!draining || !currentQueue) {
-    return;
-  }
-
-  draining = false;
-
-  if (currentQueue.length) {
-    queue = currentQueue.concat(queue);
-  } else {
-    queueIndex = -1;
-  }
-
-  if (queue.length) {
-    drainQueue();
-  }
-}
-
-function drainQueue() {
-  if (draining) {
-    return;
-  }
-
-  var timeout = runTimeout(cleanUpNextTick);
-  draining = true;
-  var len = queue.length;
-
-  while (len) {
-    currentQueue = queue;
-    queue = [];
-
-    while (++queueIndex < len) {
-      if (currentQueue) {
-        currentQueue[queueIndex].run();
-      }
-    }
-
-    queueIndex = -1;
-    len = queue.length;
-  }
-
-  currentQueue = null;
-  draining = false;
-  runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-  var args = new Array(arguments.length - 1);
-
-  if (arguments.length > 1) {
-    for (var i = 1; i < arguments.length; i++) {
-      args[i - 1] = arguments[i];
-    }
-  }
-
-  queue.push(new Item(fun, args));
-
-  if (queue.length === 1 && !draining) {
-    runTimeout(drainQueue);
-  }
-}; // v8 likes predictible objects
-
-
-function Item(fun, array) {
-  this.fun = fun;
-  this.array = array;
-}
-
-Item.prototype.run = function () {
-  this.fun.apply(null, this.array);
-};
-
-process.title = 'browser';
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) {
-  return [];
-};
-
-process.binding = function (name) {
-  throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () {
-  return '/';
-};
-
-process.chdir = function (dir) {
-  throw new Error('process.chdir is not supported');
-};
-
-process.umask = function () {
-  return 0;
-};
 },{}],"../node_modules/process-nextick-args/index.js":[function(require,module,exports) {
 var process = require("process");
 'use strict';
@@ -61853,7 +63155,7 @@ class JsonRpcProvider extends provider_1.Provider {
 }
 exports.JsonRpcProvider = JsonRpcProvider;
 
-},{"depd":"../node_modules/near-api-js/node_modules/depd/lib/browser/index.js","./provider":"../node_modules/near-api-js/lib/providers/provider.js","../utils/web":"../node_modules/near-api-js/lib/utils/web.js","../utils/errors":"../node_modules/near-api-js/lib/utils/errors.js","../utils/serialize":"../node_modules/near-api-js/lib/utils/serialize.js","../utils/rpc_errors":"../node_modules/near-api-js/lib/utils/rpc_errors.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/near-api-js/lib/providers/index.js":[function(require,module,exports) {
+},{"depd":"../node_modules/depd/lib/browser/index.js","./provider":"../node_modules/near-api-js/lib/providers/provider.js","../utils/web":"../node_modules/near-api-js/lib/utils/web.js","../utils/errors":"../node_modules/near-api-js/lib/utils/errors.js","../utils/serialize":"../node_modules/near-api-js/lib/utils/serialize.js","../utils/rpc_errors":"../node_modules/near-api-js/lib/utils/rpc_errors.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/near-api-js/lib/providers/index.js":[function(require,module,exports) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ErrorContext = exports.TypedError = exports.getTransactionLastResult = exports.FinalExecutionStatusBasic = exports.JsonRpcProvider = exports.Provider = void 0;
@@ -65095,9 +66397,9 @@ async function initContract() {
 
   const contract = await new nearAPI.Contract(walletConnection.account(), nearConfig.contractName, {
     // View methods are read-only – they don't modify the state, but usually return some value
-    viewMethods: ['getMessages'],
+    viewMethods: ['getMessages', 'getTodoList', 'getTotalTodoCount', 'getTodo'],
     // Change methods can modify the state, but you don't receive the returned value when called
-    changeMethods: ['addMessage'],
+    changeMethods: ['addMessage', 'writeTodo', 'verifyTodo'],
     // Sender is the account ID to initialize transactions.
     // getAccountId() will return empty string if user is still unauthorized
     sender: walletConnection.getAccountId()
@@ -65153,7 +66455,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56087" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "61282" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

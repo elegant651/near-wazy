@@ -1,12 +1,11 @@
+import { logging } from "near-sdk-as";
 import { PostedMessage, messages, TodoData, todoList, todoMap  } from "./model";
 
 // --- contract code goes below
 
-
 const DEFAULT_MESSAGE = "Hello";
 
-
-export function writeTodo(title: string, photo: Uint8Array): void {  
+export function writeTodo(title: string, photo: string): void {  
   const newData = new TodoData(title, photo);
   todoList.push(newData);
   todoMap.set(newData.todoId, newData);
@@ -14,9 +13,11 @@ export function writeTodo(title: string, photo: Uint8Array): void {
 
 export function verifyTodo(todoId: i32): void {
   let todoData = todoMap.get(todoId)
-  if (todoData) {
-    todoData.setVerified(true);
-  }  
+  if (todoData) {    
+    todoData.setVerified();
+    todoList[todoId-1] = todoData;
+    todoMap.set(todoId, todoData);    
+  }
 }
 
 export function getTotalTodoCount(): i32 {

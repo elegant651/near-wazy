@@ -12,8 +12,7 @@ const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed()
 const App = ({ contract, currentUser, nearConfig, wallet }) => {
   const [messages, setMessages] = useState([])
 
-  useEffect(() => {
-    // TODO: don't just fetch once; subscribe!
+  useEffect(() => {    
     contract.getMessages().then(setMessages)
   }, [])
 
@@ -23,10 +22,7 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
     const { fieldset, message, donation } = e.target.elements
 
     fieldset.disabled = true
-
-    // TODO: optimistically update page with new message,
-    // update blockchain data in background
-    // add uuid to each message, so we know which one is already known
+    
     contract.addMessage(
       { text: message.value },
       BOATLOAD_OF_GAS,
@@ -130,9 +126,13 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
               {message.text}
             </p>
           )}
-          
 
-          <FeedPage />
+          <FeedPage
+            contract={contract}
+            currentUser={currentUser}
+            nearConfig={nearConfig}
+            wallet={wallet}
+          />
         </>        
       )}
     </main>

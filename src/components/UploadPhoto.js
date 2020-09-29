@@ -5,6 +5,8 @@ import ui from '../utils/ui'
 import Input from './Input'
 import Textarea from './Textarea'
 import Button from './Button'
+import Big from 'big.js'
+import axios from 'axios'
 
 import * as photoActions from '../redux/actions/photos'
 
@@ -12,15 +14,16 @@ import './UploadPhoto.scss'
 
 const MAX_IMAGE_SIZE = 30000 // 30KB
 const MAX_IMAGE_SIZE_MB = 0.03 // 30KB
+const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed()
 
 class UploadPhoto extends Component {
   state = {
     file: '',
-    fileName: '',
-    location: '',
-    caption: '',
+    fileName: '', 
+    title: '',
     warningMessage: '',
     isCompressing: false,
+    isLoading: false
   }
 
   handleInputChange = (e) => {
@@ -45,11 +48,35 @@ class UploadPhoto extends Component {
     })
   }
 
-  handleSubmit = (e) => {
+  handleSubmit = async (e) => {
     e.preventDefault()
-    const { file, fileName, location, caption } = this.state
-    this.props.uploadPhoto(file, fileName, location, caption)
-    ui.hideModal()
+    const { file, fileName, title } = this.state
+    
+    const { contract, currentUser } =  this.props
+
+    this.setState({isLoading: true})
+
+    const formData = new FormData()
+    formData.append('file', file)
+    axios({
+      method: 'post',
+      baseURL: 'https://ipfs.infura.io:5001',
+      url: '/api/v0/add',
+      data: formData,
+      headers: {'Content-Type': 'multipart/form-data'}
+    }).then(async (response)=> {      
+      const photoURI = response.data.Hash
+
+      const result = await contract.writeTodo(
+        { title: title, photo: photoURI },
+        BOATLOAD_OF_GAS
+      )
+      console.log(result)
+      this.setState({isLoading: false})
+    
+      ui.hideModal()
+    })
+
   }
 
   compressImage = async (imageFile) => {
@@ -92,19 +119,21 @@ class UploadPhoto extends Component {
           placeholder="Your todo"
           required
         />
-        <Button
-          className="UploadPhoto__upload"
-          type="submit"
-          title="Upload"
-        />
+
+        { (this.state.isLoading) ? <Loading /> :
+          <Button
+            className="UploadPhoto__upload"
+            type="submit"
+            title="Create Todo"
+          /> }
       </form>
     )
   }
 }
 
 const mapDispatchToProps = (dispatch) => ({
-  uploadPhoto: (file, fileName, title) =>
-    dispatch(photoActions.uploadPhoto(file, fileName, title)),
+  // uploadPhoto: (file, fileName, title) =>
+  //   dispatch(photoActions.uploadPhoto(file, fileName, title)),
 })
 
 export default connect(null, mapDispatchToProps)(UploadPhoto)

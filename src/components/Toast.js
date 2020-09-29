@@ -2,7 +2,7 @@ import React, { Component } from 'react'
 import cx from 'classnames'
 import { connect } from 'react-redux'
 import ui from '../utils/ui'
-import IconButton from './IconButton'
+import Button from './Button'
 
 import './Toast.scss'
 
@@ -31,10 +31,10 @@ class Toast extends Component {
             {toast.txHash}
           </div>
         }        
-        <IconButton
-          className="Toast__close"
-          icon="icon-close.png"
+        <Button
+          className="Toast__close"          
           alt="close toast"
+          title="close"
           onClick={ui.hideToast}
         />
       </div>

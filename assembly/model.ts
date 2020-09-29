@@ -1,16 +1,16 @@
-import { context, u128, PersistentVector, PersistentMap } from "near-sdk-as";
+import { context, u128, PersistentVector, PersistentMap, logging } from "near-sdk-as";
 
 @nearBindgen
 export class TodoData {
   todoId: i32;
   owner: string;
   title: string;
-  photo: Uint8Array;
+  photo: string;
   timestamp: u64;
   isVerified: bool;
   verifier: string;
 
-  constructor(title: string, photo: Uint8Array) {
+  constructor(title: string, photo: string) {
     this.todoId = todoList.length + 1;
     this.owner = context.sender;
     this.title = title;
@@ -19,9 +19,9 @@ export class TodoData {
     this.isVerified = false;    
   }
 
-  setVerified(isVerified: bool): void {
+  setVerified(): void {
     this.isVerified = true;
-    this.verifier = context.sender;  
+    this.verifier = context.sender;    
   }
 
 }

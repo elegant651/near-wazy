@@ -3,18 +3,21 @@ import { connect } from 'react-redux'
 import moment from 'moment'
 import Loading from './Loading'
 import PhotoInfo from './PhotoInfo'
-import CopyrightInfo from './CopyrightInfo'
-import TransferOwnershipButton from './TransferOwnershipButton'
-import { drawImageFromBytes} from '../utils/imageUtils'
-import * as photoActions from '../redux/actions/photos'
+import Button from './Button'
+import ui from '../utils/ui'
+import Big from 'big.js'
 
 import './Feed.scss'
 
+const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed()
+
 class Feed extends Component {
+  
   constructor(props) {
     super(props)
     this.state = {
-      isLoading: !props.feed,
+      isLoading: false,
+      feeds: []
     }
   }
 
@@ -27,62 +30,80 @@ class Feed extends Component {
   }
 
   componentDidMount() {
-    const { feed, getFeed } = this.props
-    if (!feed) getFeed()
+    const { contract, currentUser } =  this.props
+
+    this.setState({isLoading: true})    
+
+    contract.getTodoList().then((feeds)=> {
+      console.log(feeds)
+      this.setState({isLoading: false, feeds })
+    })
+  }
+
+  async verify(todoId) {
+    const { contract } =  this.props
+
+    this.setState({isLoading: true})    
+
+    const result = await contract.verifyTodo(
+      { todoId: todoId },
+      BOATLOAD_OF_GAS
+    )
+    console.log(result)
+
+    contract.getTodoList().then((feeds)=> {
+      console.log(feeds)
+      this.setState({isLoading: false, feeds })
+    })
+
   }
 
   render() {
-    const { feed } = this.props
+    const { feeds } = this.state
 
     if (this.state.isLoading) return <Loading />
 
     return (
       <div className="Feed">
-        {feed.length !== 0
-          ? feed.map(({
-            id,
-            ownerHistory,
-            data,
-            name,            
-            caption,
+        {feeds.length !== 0
+          ? feeds.map(({
+            todoId,
+            owner,
+            title,
+            photo,            
             timestamp,
+            isVerified,
+            verifier
           }) => {
-            const originalOwner = ownerHistory[0]            
-            const imageUrl = drawImageFromBytes(data)
-            const issueDate = moment(timestamp * 1000).fromNow()
+
+            const photoUri = `https://gateway.ipfs.io/ipfs/${photo}`
+            
             return (
-              <div className="FeedPhoto" key={id}>                
+              <div className="FeedPhoto" key={todoId}>
                 <div className="FeedPhoto__image">
-                  <img src={imageUrl} alt={name} />
+                  <img src={photoUri} alt={title} />
                 </div>
                 <div className="FeedPhoto__info">
                   <PhotoInfo
-                    name={name}
-                    issueDate={issueDate}
-                    caption={caption}
-                  />
-                  <CopyrightInfo
-                    className="FeedPhoto__copyrightInfo"
-                    id={id}
-                    issueDate={issueDate}
-                    originalOwner={originalOwner}
-                    currentOwner={currentOwner}
+                    name={owner}
+                    caption={title}
+                    isVerified={isVerified}
+                    verifier={verifier}
                   />
                   {
-                    // userAddress === currentOwner && (
-                      <TransferOwnershipButton
-                        className="FeedPhoto__transferOwnership"
-                        id={id}
-                        issueDate={issueDate}
-                        currentOwner={currentOwner}
+                    isVerified ? <div>
+                      <h3>Verified from {verifier}</h3>
+                    </div> : <Button                        
+                      alt="Verify"
+                      title="verify"
+                      onClick={this.verify.bind(this, todoId)}
                       />
-                    // )
-                  }
+                  }                  
                 </div>
               </div>
             )
           })
-          : <span className="Feed__empty">No Photo</span>
+          : <span className="Feed__empty">No List</span>
         }
       </div>
     )
@@ -90,11 +111,11 @@ class Feed extends Component {
 }
 
 const mapStateToProps = (state) => ({
-  feed: state.photos.feed  
+  // feed: state.photos.feed  
 })
 
 const mapDispatchToProps = (dispatch) => ({
-  getFeed: () => dispatch(photoActions.getFeed()),
+  // getFeed: () => dispatch(photoActions.getFeed()),
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(Feed)
