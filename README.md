@@ -1,5 +1,8 @@
 # Near-Wazy
 
+Everyone creates their Todo and is verified by other users. Users post their planned work every day with photos and titles. Rewards for this activity may occur later.
+
+
 Tech Stack
 ===========
 React, Redux, Near-js, Near-as, IPFS, Near Testnet
